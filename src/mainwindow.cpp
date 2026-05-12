@@ -2,6 +2,9 @@
 #include "controlpanel.h"
 #include "scenes/caesarscene.h"
 #include "scenes/rsascene.h"
+#include "scenes/vigenerecene.h"
+#include "scenes/base64scene.h"
+#include "scenes/xorscene.h"
 #include "crypto/rsa.h"
 #include <QSplitter>
 #include <QStatusBar>
@@ -56,48 +59,54 @@ void MainWindow::setupUI() {
     setWindowTitle("CryptoFlow - 交互式密码学可视化");
     resize(1200, 700);
 
-    // Create scenes
     caesarScene_ = new CaesarScene(this);
     rsaScene_ = new RSAScene(this);
+    vigenereScene_ = new VigenereScene(this);
+    base64Scene_ = new Base64Scene(this);
+    xorScene_ = new XORScene(this);
 
-    // Graphics view
     view_ = new QGraphicsView;
     view_->setRenderHint(QPainter::Antialiasing);
     view_->setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
     view_->setStyleSheet("background: #1a1a2e; border: none;");
     view_->setScene(caesarScene_);
 
-    // Control panel
     controlPanel_ = new ControlPanel;
 
-    // Splitter: visualization left, controls right
     auto* splitter = new QSplitter(Qt::Horizontal);
     splitter->addWidget(view_);
     splitter->addWidget(controlPanel_);
     splitter->setStretchFactor(0, 3);
     splitter->setStretchFactor(1, 1);
     splitter->setHandleWidth(2);
-
     setCentralWidget(splitter);
 
-    // Connections
+    // 连接信号
     connect(controlPanel_, &ControlPanel::caesarStart, this, &MainWindow::onCaesarStart);
+    connect(controlPanel_, &ControlPanel::vigenereStart, this, &MainWindow::onVigenereStart);
     connect(controlPanel_, &ControlPanel::rsaKeyGen, this, &MainWindow::onRSAKeyGen);
     connect(controlPanel_, &ControlPanel::rsaEncrypt, this, &MainWindow::onRSAEncrypt);
     connect(controlPanel_, &ControlPanel::rsaDecrypt, this, &MainWindow::onRSADecrypt);
+    connect(controlPanel_, &ControlPanel::base64Start, this, &MainWindow::onBase64Start);
+    connect(controlPanel_, &ControlPanel::xorStart, this, &MainWindow::onXORStart);
     connect(controlPanel_, &ControlPanel::resetRequested, this, &MainWindow::onReset);
     connect(controlPanel_, &ControlPanel::speedChanged, this, &MainWindow::onSpeedChanged);
 
-    // 动画完成后自动截图
     connect(caesarScene_, &CaesarScene::animationComplete,
             this, [this]() { saveScreenshot("caesar"); });
     connect(rsaScene_, &RSAScene::animationComplete,
             this, [this]() { saveScreenshot("rsa"); });
+    connect(vigenereScene_, &VigenereScene::animationComplete,
+            this, [this]() { saveScreenshot("vigenere"); });
+    connect(base64Scene_, &Base64Scene::animationComplete,
+            this, [this]() { saveScreenshot("base64"); });
+    connect(xorScene_, &XORScene::animationComplete,
+            this, [this]() { saveScreenshot("xor"); });
 
     statusBar()->showMessage("就绪");
     qInfo() << "UI initialized";
 
-    // 显示初始欢迎信息
+    // 欢迎画面
     auto* welcomeScene = new QGraphicsScene(this);
     welcomeScene->setSceneRect(0, 0, 600, 500);
     auto* title = welcomeScene->addText("CryptoFlow", QFont("PingFang SC", 36, QFont::Bold));
@@ -112,48 +121,56 @@ void MainWindow::setupUI() {
     view_->setScene(welcomeScene);
 }
 
-void MainWindow::switchToCaesar() {
-    view_->setScene(caesarScene_);
-}
-
-void MainWindow::switchToRSA() {
-    view_->setScene(rsaScene_);
-}
-
 void MainWindow::onCaesarStart(const QString& text, int shift) {
-    switchToCaesar();
+    view_->setScene(caesarScene_);
     caesarScene_->startAnimation(text, shift);
     statusBar()->showMessage(QString("凯撒密码: 移位 %1").arg(shift));
-    qInfo() << "Caesar animation started, text:" << text << "shift:" << shift;
+}
+
+void MainWindow::onVigenereStart(const QString& text, const QString& keyword) {
+    view_->setScene(vigenereScene_);
+    vigenereScene_->startAnimation(text, keyword);
+    statusBar()->showMessage(QString("维吉尼亚密码: 关键词 %1").arg(keyword));
 }
 
 void MainWindow::onRSAKeyGen(int64_t p, int64_t q) {
-    switchToRSA();
+    view_->setScene(rsaScene_);
     rsaScene_->startKeyGen(p, q);
-    // 计算密钥并更新控制面板
     auto keys = RSAEngine::generateKeys(p, q);
     controlPanel_->setRSAValues(keys.n, keys.d);
     statusBar()->showMessage(QString("RSA 密钥生成: p=%1, q=%2").arg(p).arg(q));
-    qInfo() << "RSA keygen started, p:" << p << "q:" << q;
 }
 
 void MainWindow::onRSAEncrypt(int64_t message, int64_t e, int64_t n) {
-    switchToRSA();
+    view_->setScene(rsaScene_);
     rsaScene_->startEncrypt(message, e, n);
     statusBar()->showMessage(QString("RSA 加密: M=%1").arg(message));
-    qInfo() << "RSA encrypt started, message:" << message;
 }
 
 void MainWindow::onRSADecrypt(int64_t cipher, int64_t d, int64_t n) {
-    switchToRSA();
+    view_->setScene(rsaScene_);
     rsaScene_->startDecrypt(cipher, d, n);
     statusBar()->showMessage(QString("RSA 解密: C=%1").arg(cipher));
-    qInfo() << "RSA decrypt started, cipher:" << cipher;
+}
+
+void MainWindow::onBase64Start(const QString& text) {
+    view_->setScene(base64Scene_);
+    base64Scene_->startAnimation(text);
+    statusBar()->showMessage("Base64 编码");
+}
+
+void MainWindow::onXORStart(const QString& text, const QString& key) {
+    view_->setScene(xorScene_);
+    xorScene_->startAnimation(text, key);
+    statusBar()->showMessage(QString("XOR 加密: 密钥 %1").arg(key));
 }
 
 void MainWindow::onReset() {
     caesarScene_->reset();
     rsaScene_->reset();
+    vigenereScene_->reset();
+    base64Scene_->reset();
+    xorScene_->reset();
     statusBar()->showMessage("已重置");
     qInfo() << "Scenes reset";
 }
@@ -161,7 +178,9 @@ void MainWindow::onReset() {
 void MainWindow::onSpeedChanged(int ms) {
     caesarScene_->setSpeed(ms);
     rsaScene_->setSpeed(ms);
-    qInfo() << "Animation speed changed to" << ms << "ms";
+    vigenereScene_->setSpeed(ms);
+    base64Scene_->setSpeed(ms);
+    xorScene_->setSpeed(ms);
 }
 
 void MainWindow::saveScreenshot(const QString& prefix) {

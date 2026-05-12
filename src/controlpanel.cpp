@@ -11,35 +11,35 @@ ControlPanel::ControlPanel(QWidget* parent) : QWidget(parent) {
     layout->setSpacing(12);
     layout->setContentsMargins(12, 12, 12, 12);
 
-    // Title
     auto* title = new QLabel("CryptoFlow");
     title->setFont(QFont("PingFang SC", 18, QFont::Bold));
     title->setAlignment(Qt::AlignCenter);
     title->setObjectName("titleLabel");
     layout->addWidget(title);
 
-    // Algorithm selector
     algoCombo_ = new QComboBox;
-    algoCombo_->addItems({"凯撒密码", "RSA 加密"});
-    algoCombo_->setFont(QFont("PingFang SC", 13));
+    algoCombo_->addItems({"凯撒密码", "RSA 加密", "维吉尼亚密码", "Base64 编码", "XOR 加密"});
+    algoCombo_->setFont(QFont("PingFang SC", 12));
     connect(algoCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ControlPanel::onAlgorithmChanged);
     layout->addWidget(algoCombo_);
 
-    // Stacked widget for algorithm-specific controls
     stack_ = new QStackedWidget;
     setupCaesarPanel();
     setupRSAPanel();
+    setupVigenerePanel();
+    setupBase64Panel();
+    setupXORPanel();
     layout->addWidget(stack_);
 
-    // Speed control
+    // Speed
     auto* speedGroup = new QGroupBox("动画速度");
     auto* speedLayout = new QHBoxLayout(speedGroup);
     speedSlider_ = new QSlider(Qt::Horizontal);
     speedSlider_->setRange(100, 1500);
-    speedSlider_->setValue(500);
+    speedSlider_->setValue(800);
     speedSlider_->setInvertedAppearance(true);
-    speedLabel_ = new QLabel("500ms");
+    speedLabel_ = new QLabel("800ms");
     connect(speedSlider_, &QSlider::valueChanged, this, [this](int val) {
         speedLabel_->setText(QString("%1ms").arg(val));
         emit speedChanged(val);
@@ -48,7 +48,6 @@ ControlPanel::ControlPanel(QWidget* parent) : QWidget(parent) {
     speedLayout->addWidget(speedLabel_);
     layout->addWidget(speedGroup);
 
-    // Buttons
     startBtn_ = new QPushButton("开始演示");
     startBtn_->setObjectName("startBtn");
     startBtn_->setFont(QFont("PingFang SC", 13, QFont::Bold));
@@ -66,25 +65,40 @@ ControlPanel::ControlPanel(QWidget* parent) : QWidget(parent) {
 void ControlPanel::setupCaesarPanel() {
     auto* panel = new QWidget;
     auto* layout = new QVBoxLayout(panel);
-
-    auto* inputLabel = new QLabel("输入文本:");
-    inputLabel->setFont(QFont("PingFang SC", 11));
-    layout->addWidget(inputLabel);
-
+    auto* label = new QLabel("输入文本:");
+    label->setFont(QFont("PingFang SC", 11));
+    layout->addWidget(label);
     caesarInput_ = new QLineEdit("HELLO");
     caesarInput_->setFont(QFont("Menlo", 12));
     layout->addWidget(caesarInput_);
-
     auto* shiftLabel = new QLabel("移位量 (1-25):");
     shiftLabel->setFont(QFont("PingFang SC", 11));
     layout->addWidget(shiftLabel);
-
     caesarShift_ = new QSpinBox;
     caesarShift_->setRange(1, 25);
     caesarShift_->setValue(3);
     caesarShift_->setFont(QFont("Menlo", 12));
     layout->addWidget(caesarShift_);
+    layout->addStretch();
+    stack_->addWidget(panel);
+}
 
+void ControlPanel::setupVigenerePanel() {
+    auto* panel = new QWidget;
+    auto* layout = new QVBoxLayout(panel);
+    auto* label = new QLabel("输入文本:");
+    label->setFont(QFont("PingFang SC", 11));
+    layout->addWidget(label);
+    vigenereInput_ = new QLineEdit("HELLO");
+    vigenereInput_->setFont(QFont("Menlo", 12));
+    layout->addWidget(vigenereInput_);
+    auto* keyLabel = new QLabel("关键词 (字母):");
+    keyLabel->setFont(QFont("PingFang SC", 11));
+    layout->addWidget(keyLabel);
+    vigenereKey_ = new QLineEdit("KEY");
+    vigenereKey_->setFont(QFont("Menlo", 12));
+    layout->addWidget(vigenereKey_);
+    layout->addStretch();
     stack_->addWidget(panel);
 }
 
@@ -154,6 +168,38 @@ void ControlPanel::setupRSAPanel() {
     stack_->addWidget(panel);
 }
 
+void ControlPanel::setupBase64Panel() {
+    auto* panel = new QWidget;
+    auto* layout = new QVBoxLayout(panel);
+    auto* label = new QLabel("输入文本:");
+    label->setFont(QFont("PingFang SC", 11));
+    layout->addWidget(label);
+    base64Input_ = new QLineEdit("Hello");
+    base64Input_->setFont(QFont("Menlo", 12));
+    layout->addWidget(base64Input_);
+    layout->addStretch();
+    stack_->addWidget(panel);
+}
+
+void ControlPanel::setupXORPanel() {
+    auto* panel = new QWidget;
+    auto* layout = new QVBoxLayout(panel);
+    auto* label = new QLabel("输入文本:");
+    label->setFont(QFont("PingFang SC", 11));
+    layout->addWidget(label);
+    xorInput_ = new QLineEdit("Hello");
+    xorInput_->setFont(QFont("Menlo", 12));
+    layout->addWidget(xorInput_);
+    auto* keyLabel = new QLabel("密钥:");
+    keyLabel->setFont(QFont("PingFang SC", 11));
+    layout->addWidget(keyLabel);
+    xorKey_ = new QLineEdit("Key");
+    xorKey_->setFont(QFont("Menlo", 12));
+    layout->addWidget(xorKey_);
+    layout->addStretch();
+    stack_->addWidget(panel);
+}
+
 void ControlPanel::onAlgorithmChanged(int index) {
     stack_->setCurrentIndex(index);
     emit algorithmChanged(static_cast<Algorithm>(index));
@@ -165,9 +211,10 @@ void ControlPanel::setRSAValues(int64_t n, int64_t d) {
 }
 
 void ControlPanel::onStartClicked() {
-    if (algoCombo_->currentIndex() == Caesar) {
+    int idx = algoCombo_->currentIndex();
+    if (idx == Caesar) {
         emit caesarStart(caesarInput_->text(), caesarShift_->value());
-    } else {
+    } else if (idx == RSA) {
         int mode = rsaMode_->currentIndex();
         int64_t p = rsaP_->value();
         int64_t q = rsaQ_->value();
@@ -182,5 +229,11 @@ void ControlPanel::onStartClicked() {
                            rsaD_->text().toLongLong(),
                            rsaN_->text().toLongLong());
         }
+    } else if (idx == Vigenere) {
+        emit vigenereStart(vigenereInput_->text(), vigenereKey_->text());
+    } else if (idx == Base64) {
+        emit base64Start(base64Input_->text());
+    } else if (idx == XOR) {
+        emit xorStart(xorInput_->text(), xorKey_->text());
     }
 }

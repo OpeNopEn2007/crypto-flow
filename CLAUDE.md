@@ -1,65 +1,62 @@
 # CLAUDE.md
 
-## What to Follow
+## Project Info
 
-### 1. Plan Node Default
-- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)  
-- If something goes sideways, STOP and re-plan immediately - don't keep pushing  
-- Use plan mode for verification steps, not just building  
-- Write detailed specs upfront to reduce ambiguity  
+CryptoFlow — 交互式密码学原理可视化演示系统，南开大学密码学课程期末作业。
 
----
+### 技术栈
+- Qt 6 (Widgets) + C++20 + CMake 3.20
+- QGraphicsView/QGraphicsScene 做动画
+- QSS 深色科技主题（#0d1117 背景，霓虹蓝/绿高亮）
+- CMAKE_AUTOMOC/AUTORCC/AUTOUIC 全开
 
-### 2. Subagent Strategy
-- Use subagents liberally to keep main context window clean  
-- Offload research, exploration, and parallel analysis to subagents  
-- For complex problems, throw more compute at it via subagents  
-- One task per subagent for focused execution  
+### 构建与运行
+```bash
+cmake -B build -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
+cmake --build build
+./build/CryptoFlow
+# 自动演示
+./build/CryptoFlow --caesar "HELLO" --shift 3
+./build/CryptoFlow --rsa
+```
 
----
+### 项目结构
+```
+src/
+├── main.cpp              # CLI 解析 (--caesar, --shift, --rsa)
+├── mainwindow.h/cpp      # 主窗口，组装视图+控制面板，日志，截图
+├── controlpanel.h/cpp    # 右侧控制面板（算法选择、参数、速度）
+├── crypto/
+│   ├── caesar.h/cpp      # 凯撒密码算法层
+│   ├── rsa.h/cpp         # RSA 算法层（密钥生成、加解密）
+│   ├── vigenere.h/cpp    # 维吉尼亚密码算法层
+│   └── (base64/xor 内嵌在 scene 中)
+└── scenes/
+    ├── caesarscene.h/cpp  # 凯撒转盘动画场景
+    ├── rsascene.h/cpp     # RSA 密钥生成动画场景
+    ├── vigenerecene.h/cpp # 维吉尼亚转盘动画场景
+    ├── base64scene.h/cpp  # Base64 编码可视化场景
+    └── xorscene.h/cpp     # XOR 加密可视化场景
+resources/
+└── style.qss             # 深色主题样式
+```
 
-### 3. Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern  
-- Write rules for yourself that prevent the same mistake  
-- Ruthlessly iterate on these lessons until mistake rate drops  
-- Review lessons at session start for relevant project  
+### 架构要点
+- **MainWindow**: QSplitter 左(3)右(1)布局，自定义 messageHandler 双日志（stderr + 文件），动画完成后自动截图
+- **CaesarScene**: 外圈固定=明文，内圈旋转=密文，逆时针旋转对齐；离散步进旋转（每步 300ms 暂停 + 12帧 OutCubic 缓动）；连接线+脉冲发光；打字机效果显示结果
+- **RSAScene**: 7步密钥生成动画，居中卡片布局，圆形步骤编号，绿色高亮数值，流程箭头
+- **VigenereScene**: 双圈转盘，根据关键词每字母切换偏移量，黄色关键词显示
+- **Base64Scene**: 5步动画：原文→二进制(8bit)→6bit分组→查表→结果，彩色卡片
+- **XORScene**: 4步动画：明文→密钥循环→逐位XOR→十六进制结果
+- **ControlPanel**: QStackedWidget 切换5种算法控件，速度滑块 100-1500ms，默认 800ms
 
----
+### 开发约定
+- 信号槽只用新式语法（`&Class::method`），禁止旧式 `SIGNAL/SLOT`
+- 动画用 QTimer + QEasingCurve，不用 QPropertyAnimation（QGraphicsItem 不支持）
+- 内圈字母不使用 QGraphicsItemGroup（旋转会导致字母倾斜），手动 cos/sin 重算位置
+- 内圈旋转方向为逆时针（targetRotation_ 为负值）
 
-### 4. Verification Before Done
-- Never mark a task complete without proving it works  
-- Diff behavior between main and your changes when relevant  
-- Ask yourself: "Would a staff engineer approve this?"  
-- Run tests, check logs, demonstrate correctness  
-
----
-
-### 5. Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"  
-- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"  
-- Skip this for simple, obvious fixes - don't over-engineer  
-- Challenge your own work before presenting it  
-
----
-
-### 6. Autonomous Bug Fixing
-- When given a bug report: just fix it. Don't ask for hand-holding  
-- Point at logs, errors, failing tests - then resolve them  
-- Zero context switching required from the user  
-- Go fix failing CI tests without being told how  
-
----
-
-## Task Management
-1. **Plan First**: Write plan to `tasks/todo.md` with checkable items  
-2. **Verify Plan**: Check in before starting implementation  
-3. **Track Progress**: Mark items complete as you go  
-4. **Explain Changes**: High-level summary at each step  
-5. **Document Results**: Add review section to `tasks/todo.md`  
-6. **Capture Lessons**: Update `tasks/lessons.md` after corrections  
-
----
-
-## Core Principles
-- **Simplicity First**: Make every change as simple as possible. Impact minimal code  
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards
+### 调试
+- 日志输出到 `cryptoflow.log` + stderr
+- 动画完成后自动截图 `caesar_screenshot.png` / `rsa_screenshot.png`
+- CLI 参数支持自动启动演示

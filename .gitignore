@@ -6,3 +6,7 @@ compile_commands.json
 *.exe
 *.app
 .DS_Store
+
+# Debug artifacts
+*_screenshot.png
+*.log

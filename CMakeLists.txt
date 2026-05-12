@@ -15,8 +15,12 @@ set(SOURCES
     src/controlpanel.cpp
     src/crypto/caesar.cpp
     src/crypto/rsa.cpp
+    src/crypto/vigenere.cpp
     src/scenes/caesarscene.cpp
     src/scenes/rsascene.cpp
+    src/scenes/vigenerecene.cpp
+    src/scenes/base64scene.cpp
+    src/scenes/xorscene.cpp
 )
 
 set(HEADERS
@@ -24,8 +28,12 @@ set(HEADERS
     src/controlpanel.h
     src/crypto/caesar.h
     src/crypto/rsa.h
+    src/crypto/vigenere.h
     src/scenes/caesarscene.h
     src/scenes/rsascene.h
+    src/scenes/vigenerecene.h
+    src/scenes/base64scene.h
+    src/scenes/xorscene.h
 )
 
 set(RESOURCES resources/resources.qrc)
