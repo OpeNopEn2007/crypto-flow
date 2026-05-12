@@ -17,16 +17,37 @@ signals:
     void animationComplete();
 
 private slots:
-    void animateStep();
+    void onPhaseTick();
+    void animatePulse();
 
 private:
-    void addCard(int step, const QString& title, const QString& detail,
-                 const QString& value, QColor accent);
+    void setupTitle();
+    void clearPhase();
+    QGraphicsTextItem* addCenteredText(const QString& text, const QFont& font,
+                                       QColor color, double y);
+    QGraphicsRectItem* addDataBox(double x, double y, double w, double h,
+                                   QColor borderColor, QColor bgColor);
+    void addFlowArrow(double x1, double y1, double x2, double y2, QColor color);
+    QGraphicsTextItem* addLabel(double x, double y, const QString& text,
+                                 QFont font, QColor color);
 
-    QTimer* timer_ = nullptr;
-    QVector<QPair<QString, QPair<QString, QString>>> pendingSteps_;
-    QVector<QColor> pendingAccents_;
-    int currentStep_ = 0;
+    QTimer* phaseTimer_ = nullptr;
+    QTimer* pulseTimer_ = nullptr;
+
+    int currentPhase_ = 0;
+    int totalPhases_ = 0;
     int animSpeed_ = 1000;
-    int totalSteps_ = 0;
+    int animationId_ = 0;
+
+    // 数据
+    QString inputText_;
+    QByteArray inputBytes_;
+    QString binaryString_;
+    QVector<QString> sixBitGroups_;
+    QVector<int> groupValues_;
+    QString b64Result_;
+
+    // 场景元素
+    QVector<QGraphicsItem*> phaseItems_;
+    double pulsePhase_ = 0;
 };

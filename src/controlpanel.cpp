@@ -4,6 +4,18 @@
 #include <QGroupBox>
 #include <QStackedWidget>
 #include <QFont>
+#include <QMessageBox>
+#include <QtMath>
+
+static bool isPrime(int64_t n) {
+    if (n < 2) return false;
+    if (n == 2 || n == 3) return true;
+    if (n % 2 == 0 || n % 3 == 0) return false;
+    for (int64_t i = 5; i * i <= n; i += 6) {
+        if (n % i == 0 || n % (i + 2) == 0) return false;
+    }
+    return true;
+}
 
 ControlPanel::ControlPanel(QWidget* parent) : QWidget(parent) {
     setFixedWidth(280);
@@ -219,6 +231,15 @@ void ControlPanel::onStartClicked() {
         int64_t p = rsaP_->value();
         int64_t q = rsaQ_->value();
         if (mode == 0) {
+            if (!isPrime(p) || !isPrime(q)) {
+                QMessageBox::warning(this, "输入错误",
+                    QString("p 和 q 必须是素数!\n当前: p=%1, q=%2").arg(p).arg(q));
+                return;
+            }
+            if (p == q) {
+                QMessageBox::warning(this, "输入错误", "p 和 q 不能相同!");
+                return;
+            }
             emit rsaKeyGen(p, q);
         } else if (mode == 1) {
             emit rsaEncrypt(rsaMessage_->text().toLongLong(),

@@ -233,7 +233,6 @@ void CaesarScene::animateHighlight() {
 
     if (highlightShowing_) {
         clearHighlights();
-        clearConnectionLines();
         highlightShowing_ = false;
         highlightIndex_++;
         highlightTimer_->setInterval(300);
@@ -265,7 +264,6 @@ void CaesarScene::animateHighlight() {
         int outerIdx = ch.unicode() - 'A';
         int innerIdx = (outerIdx + shift_) % 26;
         highlightPair(outerIdx, innerIdx);
-        startConnectionLineAnimation(outerIdx, innerIdx);
         QChar encrypted = QChar('A' + innerIdx);
         resultText_->setPlainText(resultText_->toPlainText() + encrypted);
         qDebug() << "[Caesar] Highlight" << highlightIndex_ << ":" << ch << "->" << encrypted;
