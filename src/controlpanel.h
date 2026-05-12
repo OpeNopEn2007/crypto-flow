@@ -12,6 +12,7 @@ class ControlPanel : public QWidget {
     Q_OBJECT
 public:
     explicit ControlPanel(QWidget* parent = nullptr);
+    void setRSAValues(int64_t n, int64_t d);
 
     enum Algorithm { Caesar, RSA };
 

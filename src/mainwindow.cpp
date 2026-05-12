@@ -2,6 +2,7 @@
 #include "controlpanel.h"
 #include "scenes/caesarscene.h"
 #include "scenes/rsascene.h"
+#include "crypto/rsa.h"
 #include <QSplitter>
 #include <QStatusBar>
 #include <QFile>
@@ -95,6 +96,20 @@ void MainWindow::setupUI() {
 
     statusBar()->showMessage("就绪");
     qInfo() << "UI initialized";
+
+    // 显示初始欢迎信息
+    auto* welcomeScene = new QGraphicsScene(this);
+    welcomeScene->setSceneRect(0, 0, 600, 500);
+    auto* title = welcomeScene->addText("CryptoFlow", QFont("PingFang SC", 36, QFont::Bold));
+    title->setDefaultTextColor(QColor(0, 200, 255));
+    title->setPos(150, 150);
+    auto* subtitle = welcomeScene->addText("交互式密码学原理可视化", QFont("PingFang SC", 16));
+    subtitle->setDefaultTextColor(QColor(150, 150, 150));
+    subtitle->setPos(170, 220);
+    auto* hint = welcomeScene->addText("← 选择算法，点击开始演示", QFont("PingFang SC", 13));
+    hint->setDefaultTextColor(QColor(100, 100, 100));
+    hint->setPos(180, 280);
+    view_->setScene(welcomeScene);
 }
 
 void MainWindow::switchToCaesar() {
@@ -115,6 +130,9 @@ void MainWindow::onCaesarStart(const QString& text, int shift) {
 void MainWindow::onRSAKeyGen(int64_t p, int64_t q) {
     switchToRSA();
     rsaScene_->startKeyGen(p, q);
+    // 计算密钥并更新控制面板
+    auto keys = RSAEngine::generateKeys(p, q);
+    controlPanel_->setRSAValues(keys.n, keys.d);
     statusBar()->showMessage(QString("RSA 密钥生成: p=%1, q=%2").arg(p).arg(q));
     qInfo() << "RSA keygen started, p:" << p << "q:" << q;
 }

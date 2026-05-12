@@ -159,6 +159,11 @@ void ControlPanel::onAlgorithmChanged(int index) {
     emit algorithmChanged(static_cast<Algorithm>(index));
 }
 
+void ControlPanel::setRSAValues(int64_t n, int64_t d) {
+    rsaN_->setText(QString::number(n));
+    rsaD_->setText(QString::number(d));
+}
+
 void ControlPanel::onStartClicked() {
     if (algoCombo_->currentIndex() == Caesar) {
         emit caesarStart(caesarInput_->text(), caesarShift_->value());
