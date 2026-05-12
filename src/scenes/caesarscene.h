@@ -2,7 +2,6 @@
 #include <QGraphicsScene>
 #include <QGraphicsEllipseItem>
 #include <QGraphicsTextItem>
-#include <QGraphicsItemGroup>
 #include <QTimer>
 #include <QVector>
 
@@ -24,6 +23,7 @@ private slots:
 private:
     void drawOuterRing();
     void drawInnerRing();
+    void updateInnerLetterPositions(double rotationDeg);
     void highlightPair(int outerIdx, int innerIdx);
 
     QGraphicsEllipseItem* outerRing_ = nullptr;
@@ -31,10 +31,6 @@ private:
     QVector<QGraphicsTextItem*> outerLetters_;
     QVector<QGraphicsTextItem*> innerLetters_;
     QGraphicsTextItem* resultText_ = nullptr;
-
-    // 内圈旋转用的 group
-    QGraphicsItemGroup* innerGroup_ = nullptr;
-    QTransform originalInnerTransform_;
 
     QTimer* rotateTimer_ = nullptr;
     QTimer* highlightTimer_ = nullptr;
@@ -47,6 +43,5 @@ private:
     double targetRotation_ = 0;
     double rotateStep_ = 0;
 
-    // 高亮阶段
     int highlightIndex_ = 0;
 };
