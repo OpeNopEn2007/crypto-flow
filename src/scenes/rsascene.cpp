@@ -84,6 +84,7 @@ void RSAScene::animateStep() {
     if (currentStep_ >= pendingSteps_.size()) {
         timer_->stop();
         qInfo() << "[RSA] Animation complete";
+        emit animationComplete();
         return;
     }
 

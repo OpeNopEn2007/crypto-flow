@@ -13,6 +13,9 @@ public:
     void reset();
     void setSpeed(int ms);
 
+signals:
+    void animationComplete();
+
 private slots:
     void animateStep();
 

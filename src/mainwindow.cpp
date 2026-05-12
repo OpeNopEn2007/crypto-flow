@@ -87,6 +87,12 @@ void MainWindow::setupUI() {
     connect(controlPanel_, &ControlPanel::resetRequested, this, &MainWindow::onReset);
     connect(controlPanel_, &ControlPanel::speedChanged, this, &MainWindow::onSpeedChanged);
 
+    // 动画完成后自动截图
+    connect(caesarScene_, &CaesarScene::animationComplete,
+            this, [this]() { saveScreenshot("caesar"); });
+    connect(rsaScene_, &RSAScene::animationComplete,
+            this, [this]() { saveScreenshot("rsa"); });
+
     statusBar()->showMessage("就绪");
     qInfo() << "UI initialized";
 }
@@ -104,10 +110,6 @@ void MainWindow::onCaesarStart(const QString& text, int shift) {
     caesarScene_->startAnimation(text, shift);
     statusBar()->showMessage(QString("凯撒密码: 移位 %1").arg(shift));
     qInfo() << "Caesar animation started, text:" << text << "shift:" << shift;
-
-    // 动画完成后自动截图
-    QTimer::singleShot(shift * caesarScene_->property("speed").toInt() + 500,
-                       this, [this]() { saveScreenshot("caesar"); });
 }
 
 void MainWindow::onRSAKeyGen(int64_t p, int64_t q) {
