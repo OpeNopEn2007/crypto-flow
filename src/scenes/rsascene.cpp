@@ -3,6 +3,7 @@
 #include <QPen>
 #include <QBrush>
 #include <QFont>
+#include <QDebug>
 
 RSAScene::RSAScene(QObject* parent)
     : QGraphicsScene(parent), timer_(new QTimer(this)) {
@@ -44,10 +45,12 @@ void RSAScene::drawFlowArrow(double y) {
 
 void RSAScene::startKeyGen(int64_t p, int64_t q) {
     reset();
+    qInfo() << "[RSA] Starting key generation, p:" << p << "q:" << q;
 
     auto steps = RSAEngine::keyGenSteps(p, q);
     for (const auto& step : steps) {
         pendingSteps_.append({step.description, {step.formula, QString::number(step.value)}});
+        qDebug() << "[RSA] Step:" << step.description << "=" << step.value;
     }
 
     timer_->start(animSpeed_);
@@ -80,11 +83,13 @@ void RSAScene::startDecrypt(int64_t cipher, int64_t d, int64_t n) {
 void RSAScene::animateStep() {
     if (currentStep_ >= pendingSteps_.size()) {
         timer_->stop();
+        qInfo() << "[RSA] Animation complete";
         return;
     }
 
     auto& step = pendingSteps_[currentStep_];
     addStep(step.first, step.second.first, step.second.second);
+    qDebug() << "[RSA] Step" << currentStep_ << ":" << step.first;
     currentStep_++;
 }
 

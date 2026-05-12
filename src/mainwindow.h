@@ -20,6 +20,7 @@ private slots:
     void onRSADecrypt(int64_t cipher, int64_t d, int64_t n);
     void onReset();
     void onSpeedChanged(int ms);
+    void saveScreenshot(const QString& prefix);
 
 private:
     void setupUI();

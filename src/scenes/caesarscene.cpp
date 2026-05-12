@@ -2,6 +2,7 @@
 #include <QGraphicsDropShadowEffect>
 #include <QFont>
 #include <QtMath>
+#include <QDebug>
 
 static const double RADIUS_OUTER = 180;
 static const double RADIUS_INNER = 120;
@@ -58,6 +59,7 @@ void CaesarScene::startAnimation(const QString& text, int shift) {
     reset();
     inputText_ = text.toUpper();
     shift_ = ((shift % 26) + 26) % 26;
+    qInfo() << "[Caesar] Starting animation, text:" << inputText_ << "shift:" << shift_;
 
     drawOuterRing();
     drawInnerRing();
@@ -75,6 +77,7 @@ void CaesarScene::startAnimation(const QString& text, int shift) {
 void CaesarScene::animateStep() {
     if (currentStep_ >= inputText_.size()) {
         timer_->stop();
+        qInfo() << "[Caesar] Animation complete, result:" << resultText_->toPlainText();
         return;
     }
 
@@ -84,6 +87,7 @@ void CaesarScene::animateStep() {
         highlightLetter(idx);
         QChar encrypted = QChar('A' + (idx + shift_) % 26);
         resultText_->setPlainText(resultText_->toPlainText() + encrypted);
+        qDebug() << "[Caesar] Step" << currentStep_ << ":" << ch << "->" << encrypted;
     } else {
         resultText_->setPlainText(resultText_->toPlainText() + ch);
     }

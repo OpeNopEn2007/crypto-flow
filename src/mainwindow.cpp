@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QDateTime>
 #include <QDebug>
+#include <QTimer>
 
 static QFile* g_logFile = nullptr;
 
@@ -103,6 +104,10 @@ void MainWindow::onCaesarStart(const QString& text, int shift) {
     caesarScene_->startAnimation(text, shift);
     statusBar()->showMessage(QString("凯撒密码: 移位 %1").arg(shift));
     qInfo() << "Caesar animation started, text:" << text << "shift:" << shift;
+
+    // 动画完成后自动截图
+    QTimer::singleShot(shift * caesarScene_->property("speed").toInt() + 500,
+                       this, [this]() { saveScreenshot("caesar"); });
 }
 
 void MainWindow::onRSAKeyGen(int64_t p, int64_t q) {
@@ -137,4 +142,12 @@ void MainWindow::onSpeedChanged(int ms) {
     caesarScene_->setSpeed(ms);
     rsaScene_->setSpeed(ms);
     qInfo() << "Animation speed changed to" << ms << "ms";
+}
+
+void MainWindow::saveScreenshot(const QString& prefix) {
+    QImage image(view_->viewport()->size(), QImage::Format_ARGB32);
+    view_->viewport()->render(&image);
+    QString filename = QString("%1_screenshot.png").arg(prefix);
+    image.save(filename);
+    qInfo() << "Screenshot saved:" << filename;
 }
