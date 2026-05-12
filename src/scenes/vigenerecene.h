@@ -18,14 +18,18 @@ signals:
     void animationComplete();
 
 private slots:
-    void onStepTick();
-    void onStepAnimTick();
-    void animateHighlight();
+    void onRotateStepTick();
+    void onRotateStepAnimTick();
+    void onLetterTick();
     void animatePulse();
 
 private:
     void drawRings();
     void setInnerRingRotation(double deg);
+    void clearHighlights();
+    void showExplanation(const QString& text);
+    void startLetterRotation(int targetShift);
+    void highlightPair(int outerIdx, int innerIdx);
 
     QGraphicsEllipseItem* outerRing_ = nullptr;
     QGraphicsEllipseItem* innerRing_ = nullptr;
@@ -33,10 +37,11 @@ private:
     QVector<QGraphicsTextItem*> innerLetters_;
     QGraphicsTextItem* resultText_ = nullptr;
     QGraphicsTextItem* keywordDisplay_ = nullptr;
+    QGraphicsTextItem* explanation_ = nullptr;
 
-    QTimer* stepTimer_ = nullptr;
-    QTimer* stepAnimTimer_ = nullptr;
-    QTimer* highlightTimer_ = nullptr;
+    QTimer* rotateStepTimer_ = nullptr;
+    QTimer* rotateStepAnimTimer_ = nullptr;
+    QTimer* letterTimer_ = nullptr;
     QTimer* pulseTimer_ = nullptr;
 
     QString inputText_;
@@ -44,7 +49,10 @@ private:
     QVector<int> shifts_;
     int animSpeed_ = 800;
 
-    // 逐格旋转
+    // 当前正在处理的字母索引
+    int currentLetterIndex_ = 0;
+
+    // 逐格旋转状态
     double currentRotation_ = 0;
     int rotateStepIndex_ = 0;
     int rotateStepTotal_ = 0;
@@ -52,17 +60,17 @@ private:
     double stepToDeg_ = 0;
     int stepAnimFrame_ = 0;
     static const int STEP_ANIM_FRAMES = 12;
-    static const int STEP_INTERVAL_MS = 400;
+    static const int STEP_INTERVAL_MS = 300;
 
-    int highlightIndex_ = 0;
+    // 高亮状态
     bool highlightShowing_ = false;
-    int animationId_ = 0;
 
     // 脉冲
     double pulsePhase_ = 0;
 
+    // 动画保护
+    int animationId_ = 0;
+
     // 结果
-    int resultCharIndex_ = 0;
-    QString resultTarget_;
-    bool typewriterActive_ = false;
+    QString resultString_;
 };

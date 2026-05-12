@@ -134,6 +134,10 @@ void CaesarScene::startAnimation(const QString& text, int shift) {
     resultCharIndex_ = 0;
     typewriterActive_ = false;
 
+    // 初始说明
+    showExplanation(QString("凯撒密码: 每个字母后移 %1 位 (A→%2)")
+        .arg(shift_).arg(QChar('A' + shift_)));
+
     pulsePhase_ = 0;
     pulseTimer_->start(50);
 
@@ -177,6 +181,12 @@ void CaesarScene::onStepTick() {
     rotateStepIndex_++;
     qDebug() << "[Caesar] Step" << rotateStepIndex_ << "/" << rotateStepTotal_
              << ": " << stepFromDeg_ << "->" << stepToDeg_ << "deg";
+
+    // 旋转阶段说明
+    QChar fromCh = QChar('A' + rotateStepIndex_ - 1);
+    QChar toCh = QChar('A' + rotateStepIndex_);
+    showExplanation(QString("内圈旋转第 %1/%2 格: %3 → %4")
+        .arg(rotateStepIndex_).arg(rotateStepTotal_).arg(fromCh).arg(toCh));
 
     // 启动格内过渡动画
     stepAnimTimer_->start(20);
@@ -241,6 +251,7 @@ void CaesarScene::animateHighlight() {
 
         typewriterActive_ = true;
         highlightTimer_->start(80);
+        showExplanation("加密完成! 结果: " + resultTarget_);
         return;
     }
 
@@ -253,6 +264,9 @@ void CaesarScene::animateHighlight() {
         QChar encrypted = QChar('A' + innerIdx);
         resultText_->setPlainText(resultText_->toPlainText() + encrypted);
         qDebug() << "[Caesar] Highlight" << highlightIndex_ << ":" << ch << "->" << encrypted;
+
+        showExplanation(QString("第 %1 个字母: %2 → %3 (偏移 %4)")
+            .arg(highlightIndex_ + 1).arg(ch).arg(encrypted).arg(shift_));
     } else {
         resultText_->setPlainText(resultText_->toPlainText() + ch);
         highlightIndex_++;
@@ -354,6 +368,17 @@ void CaesarScene::clearConnectionLines() {
     connectionLines_.clear();
 }
 
+void CaesarScene::showExplanation(const QString& text) {
+    if (!explanation_) {
+        explanation_ = addText("", QFont("PingFang SC", 13));
+        explanation_->setDefaultTextColor(QColor(200, 200, 200));
+        explanation_->setZValue(10);
+    }
+    explanation_->setPlainText(text);
+    QRectF r = explanation_->boundingRect();
+    explanation_->setPos(CENTER_X - r.width() / 2, CENTER_Y + RADIUS_OUTER + 25);
+}
+
 void CaesarScene::reset() {
     stepTimer_->stop();
     stepAnimTimer_->stop();
@@ -367,6 +392,7 @@ void CaesarScene::reset() {
     outerRing_ = nullptr;
     innerRing_ = nullptr;
     resultText_ = nullptr;
+    explanation_ = nullptr;
     currentRotation_ = 0;
     rotateStepIndex_ = 0;
     rotateStepTotal_ = 0;

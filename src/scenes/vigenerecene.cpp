@@ -1,5 +1,4 @@
 #include "vigenerecene.h"
-#include "../crypto/vigenere.h"
 #include <QGraphicsDropShadowEffect>
 #include <QFont>
 #include <QtMath>
@@ -9,7 +8,7 @@
 static const double R_OUTER = 170;
 static const double R_INNER = 110;
 static const double CX = 300;
-static const double CY = 250;
+static const double CY = 240;
 static const double DEG = 360.0 / 26;
 
 static QGraphicsDropShadowEffect* glow(QColor c, int blur = 15) {
@@ -22,14 +21,14 @@ static QGraphicsDropShadowEffect* glow(QColor c, int blur = 15) {
 
 VigenereScene::VigenereScene(QObject* parent)
     : QGraphicsScene(parent)
-    , stepTimer_(new QTimer(this))
-    , stepAnimTimer_(new QTimer(this))
-    , highlightTimer_(new QTimer(this))
+    , rotateStepTimer_(new QTimer(this))
+    , rotateStepAnimTimer_(new QTimer(this))
+    , letterTimer_(new QTimer(this))
     , pulseTimer_(new QTimer(this)) {
     setSceneRect(0, 0, 600, 500);
-    connect(stepTimer_, &QTimer::timeout, this, &VigenereScene::onStepTick);
-    connect(stepAnimTimer_, &QTimer::timeout, this, &VigenereScene::onStepAnimTick);
-    connect(highlightTimer_, &QTimer::timeout, this, &VigenereScene::animateHighlight);
+    connect(rotateStepTimer_, &QTimer::timeout, this, &VigenereScene::onRotateStepTick);
+    connect(rotateStepAnimTimer_, &QTimer::timeout, this, &VigenereScene::onRotateStepAnimTick);
+    connect(letterTimer_, &QTimer::timeout, this, &VigenereScene::onLetterTick);
     connect(pulseTimer_, &QTimer::timeout, this, &VigenereScene::animatePulse);
 }
 
@@ -39,6 +38,17 @@ void VigenereScene::drawRings() {
                              QPen(QColor(0, 200, 255), 3));
     outerRing_->setZValue(0);
     outerRing_->setGraphicsEffect(glow(QColor(0, 200, 255), 25));
+
+    // 刻度线
+    for (int i = 0; i < 26; i++) {
+        double a = (i * DEG - 90) * M_PI / 180;
+        double x1 = CX + R_OUTER * 0.95 * cos(a);
+        double y1 = CY + R_OUTER * 0.95 * sin(a);
+        double x2 = CX + R_OUTER * 1.02 * cos(a);
+        double y2 = CY + R_OUTER * 1.02 * sin(a);
+        auto* tick = addLine(x1, y1, x2, y2, QPen(QColor(0, 200, 255, 120), 1));
+        tick->setZValue(0);
+    }
 
     QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     for (int i = 0; i < 26; i++) {
@@ -58,6 +68,16 @@ void VigenereScene::drawRings() {
     innerRing_->setZValue(0);
     innerRing_->setGraphicsEffect(glow(QColor(255, 100, 50), 18));
     innerRing_->setTransformOriginPoint(CX, CY);
+
+    for (int i = 0; i < 26; i++) {
+        double a = (i * DEG - 90) * M_PI / 180;
+        double x1 = CX + R_INNER * 0.92 * cos(a);
+        double y1 = CY + R_INNER * 0.92 * sin(a);
+        double x2 = CX + R_INNER * 0.98 * cos(a);
+        double y2 = CY + R_INNER * 0.98 * sin(a);
+        auto* tick = addLine(x1, y1, x2, y2, QPen(QColor(255, 100, 50, 100), 1));
+        tick->setZValue(0);
+    }
 
     for (int i = 0; i < 26; i++) {
         double a = (i * DEG - 90) * M_PI / 180;
@@ -81,10 +101,22 @@ void VigenereScene::setInnerRingRotation(double deg) {
     }
 }
 
+void VigenereScene::showExplanation(const QString& text) {
+    if (!explanation_) {
+        explanation_ = addText("", QFont("PingFang SC", 13));
+        explanation_->setDefaultTextColor(QColor(200, 200, 200));
+        explanation_->setZValue(10);
+    }
+    explanation_->setPlainText(text);
+    QRectF r = explanation_->boundingRect();
+    explanation_->setPos(CX - r.width() / 2, CY + R_OUTER + 40);
+}
+
 void VigenereScene::startAnimation(const QString& text, const QString& keyword) {
     reset();
     inputText_ = text.toUpper();
     keyword_ = keyword.toUpper().remove(QRegularExpression("[^A-Z]"));
+    if (keyword_.isEmpty()) return;
 
     // 计算每个字母的 shift
     QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -124,41 +156,157 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
     resultText_->setDefaultTextColor(QColor(0, 255, 150));
     resultText_->setZValue(5);
     resultText_->setGraphicsEffect(glow(QColor(0, 255, 150), 20));
-    resultText_->setVisible(false);
-    resultTarget_ = "";
-    resultCharIndex_ = 0;
-    typewriterActive_ = false;
+    resultText_->setVisible(true);
+    QRectF r = resultText_->boundingRect();
+    resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
 
+    resultString_.clear();
     pulsePhase_ = 0;
     pulseTimer_->start(50);
-
-    // 逐字母旋转（每个字母用对应的 shift）
     currentRotation_ = 0;
-    rotateStepIndex_ = 0;
-    // 只旋转字母字符的 shift
-    rotateStepTotal_ = 0;
-    for (int s : shifts_) {
-        if (s > 0) rotateStepTotal_ += s;
-    }
-    // 如果有非零 shift，计算总旋转量
-    // 实际上我们逐字母处理，每个字母独立旋转
+    currentLetterIndex_ = 0;
 
+    // 显示初始说明
+    showExplanation("维吉尼亚密码: 使用关键词对每个字母施加不同偏移量");
+
+    // 1 秒延迟后开始处理第一个字母
     animationId_++;
     int myId = animationId_;
-    rotateStepIndex_ = 0;
-
-    // 找到第一个需要旋转的字母
     QTimer::singleShot(1000, this, [this, myId]() {
         if (myId != animationId_) return;
-        highlightIndex_ = 0;
-        highlightShowing_ = false;
-        highlightTimer_->start(animSpeed_);
+        currentLetterIndex_ = 0;
+        onLetterTick();
     });
 }
 
-void VigenereScene::onStepTick() {}
+void VigenereScene::onLetterTick() {
+    if (currentLetterIndex_ >= inputText_.size()) {
+        letterTimer_->stop();
+        // 所有字母处理完毕
+        pulseTimer_->stop();
+        outerRing_->setGraphicsEffect(glow(QColor(0, 200, 255), 25));
+        innerRing_->setGraphicsEffect(glow(QColor(255, 100, 50), 18));
 
-void VigenereScene::onStepAnimTick() {
+        // 居中显示结果
+        resultText_->setPlainText(resultString_);
+        QRectF r = resultText_->boundingRect();
+        resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
+
+        showExplanation("加密完成! 结果: " + resultString_);
+        qInfo() << "[Vigenere] Complete, result:" << resultString_;
+        emit animationComplete();
+        return;
+    }
+
+    QChar ch = inputText_[currentLetterIndex_];
+    int shift = shifts_[currentLetterIndex_];
+
+    if (!ch.isLetter()) {
+        // 非字母直接加入结果
+        resultString_ += ch;
+        resultText_->setPlainText(resultString_);
+        QRectF r = resultText_->boundingRect();
+        resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
+        currentLetterIndex_++;
+        // 立即处理下一个
+        QTimer::singleShot(200, this, [this, myId = animationId_]() {
+            if (myId == animationId_) onLetterTick();
+        });
+        return;
+    }
+
+    // 字母处理：显示说明 → 逐格旋转 → 高亮 → 下一个
+    QChar keyCh = keyword_[currentLetterIndex_ % keyword_.size()];
+    QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    int keyIdx = alpha.indexOf(keyCh);
+    QChar encrypted = QChar('A' + (ch.unicode() - 'A' + keyIdx) % 26);
+
+    QString expl = QString("第 %1 个字母: 明文 %2 + 密钥 %3 (偏移 %4) → %5")
+        .arg(currentLetterIndex_ + 1)
+        .arg(ch).arg(keyCh).arg(keyIdx).arg(encrypted);
+    showExplanation(expl);
+
+    qInfo() << "[Vigenere] Letter" << currentLetterIndex_ << ":"
+            << ch << "+ key" << keyCh << "(" << keyIdx << ")" << "->" << encrypted;
+
+    // 开始逐格旋转
+    startLetterRotation(keyIdx);
+}
+
+void VigenereScene::startLetterRotation(int targetShift) {
+    rotateStepIndex_ = 0;
+    rotateStepTotal_ = targetShift;
+
+    if (rotateStepTotal_ == 0) {
+        // 偏移为 0，直接高亮
+        int outerIdx = inputText_[currentLetterIndex_].unicode() - 'A';
+        int innerIdx = outerIdx;
+        highlightPair(outerIdx, innerIdx);
+
+        QChar encrypted = QChar('A' + innerIdx);
+        resultString_ += encrypted;
+        resultText_->setPlainText(resultString_);
+        QRectF r = resultText_->boundingRect();
+        resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
+
+        currentLetterIndex_++;
+        highlightShowing_ = true;
+        QTimer::singleShot(animSpeed_, this, [this, myId = animationId_]() {
+            if (myId != animationId_) return;
+            clearHighlights();
+            highlightShowing_ = false;
+            onLetterTick();
+        });
+        return;
+    }
+
+    stepFromDeg_ = currentRotation_;
+    stepAnimFrame_ = 0;
+
+    qInfo() << "[Vigenere] Rotating" << rotateStepTotal_ << "steps for shift";
+
+    // 开始第一格
+    onRotateStepTick();
+    if (rotateStepTotal_ > 0) {
+        rotateStepTimer_->start(STEP_INTERVAL_MS);
+    }
+}
+
+void VigenereScene::onRotateStepTick() {
+    if (rotateStepIndex_ >= rotateStepTotal_) {
+        rotateStepTimer_->stop();
+        // 旋转完成，高亮配对
+        int outerIdx = inputText_[currentLetterIndex_].unicode() - 'A';
+        int innerIdx = (outerIdx + rotateStepTotal_) % 26;
+        highlightPair(outerIdx, innerIdx);
+
+        QChar encrypted = QChar('A' + innerIdx);
+        resultString_ += encrypted;
+        resultText_->setPlainText(resultString_);
+        QRectF r = resultText_->boundingRect();
+        resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
+
+        currentLetterIndex_++;
+        highlightShowing_ = true;
+
+        // 高亮一段时间后清除并处理下一个
+        QTimer::singleShot(animSpeed_, this, [this, myId = animationId_]() {
+            if (myId != animationId_) return;
+            clearHighlights();
+            highlightShowing_ = false;
+            onLetterTick();
+        });
+        return;
+    }
+
+    stepFromDeg_ = currentRotation_;
+    stepToDeg_ = -(rotateStepIndex_ + 1) * DEG;
+    stepAnimFrame_ = 0;
+    rotateStepIndex_++;
+    rotateStepAnimTimer_->start(20);
+}
+
+void VigenereScene::onRotateStepAnimTick() {
     stepAnimFrame_++;
     double t = static_cast<double>(stepAnimFrame_) / STEP_ANIM_FRAMES;
     QEasingCurve curve(QEasingCurve::OutCubic);
@@ -166,103 +314,32 @@ void VigenereScene::onStepAnimTick() {
     currentRotation_ = stepFromDeg_ + (stepToDeg_ - stepFromDeg_) * eased;
     if (stepAnimFrame_ >= STEP_ANIM_FRAMES) {
         currentRotation_ = stepToDeg_;
-        stepAnimTimer_->stop();
+        rotateStepAnimTimer_->stop();
     }
     setInnerRingRotation(currentRotation_);
 }
 
-void VigenereScene::animateHighlight() {
-    if (typewriterActive_) {
-        if (resultCharIndex_ < resultTarget_.size()) {
-            resultCharIndex_++;
-            resultText_->setPlainText(resultTarget_.left(resultCharIndex_));
-            QRectF r = resultText_->boundingRect();
-            resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
-        } else {
-            highlightTimer_->stop();
-            typewriterActive_ = false;
-            qInfo() << "[Vigenere] Complete, result:" << resultText_->toPlainText();
-            emit animationComplete();
-        }
-        return;
+void VigenereScene::highlightPair(int outerIdx, int innerIdx) {
+    clearHighlights();
+    if (outerIdx >= 0 && outerIdx < outerLetters_.size()) {
+        outerLetters_[outerIdx]->setDefaultTextColor(QColor(255, 255, 0));
+        outerLetters_[outerIdx]->setGraphicsEffect(glow(QColor(255, 255, 0), 30));
     }
-
-    if (highlightShowing_) {
-        // 清除高亮
-        for (auto* l : outerLetters_) {
-            l->setDefaultTextColor(QColor(0, 200, 255));
-            l->setGraphicsEffect(nullptr);
-        }
-        for (auto* l : innerLetters_) {
-            l->setDefaultTextColor(QColor(255, 100, 50));
-            l->setGraphicsEffect(nullptr);
-        }
-        highlightShowing_ = false;
-        highlightIndex_++;
-        highlightTimer_->setInterval(150);
-        return;
+    if (innerIdx >= 0 && innerIdx < innerLetters_.size()) {
+        innerLetters_[innerIdx]->setDefaultTextColor(QColor(255, 255, 0));
+        innerLetters_[innerIdx]->setGraphicsEffect(glow(QColor(255, 255, 0), 30));
     }
+}
 
-    if (highlightIndex_ >= inputText_.size()) {
-        highlightTimer_->stop();
-        pulseTimer_->stop();
-        outerRing_->setGraphicsEffect(glow(QColor(0, 200, 255), 25));
-        innerRing_->setGraphicsEffect(glow(QColor(255, 100, 50), 18));
-
-        resultTarget_ = resultText_->toPlainText();
-        resultCharIndex_ = 0;
-        resultText_->setPlainText("");
-        resultText_->setVisible(true);
-        QRectF r = resultText_->boundingRect();
-        resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
-        typewriterActive_ = true;
-        highlightTimer_->start(80);
-        return;
+void VigenereScene::clearHighlights() {
+    for (auto* l : outerLetters_) {
+        l->setDefaultTextColor(QColor(0, 200, 255));
+        l->setGraphicsEffect(nullptr);
     }
-
-    QChar ch = inputText_[highlightIndex_];
-    int shift = shifts_[highlightIndex_];
-
-    if (ch.isLetter() && shift > 0) {
-        // 旋转内圈到对应 shift
-        stepFromDeg_ = currentRotation_;
-        stepToDeg_ = -shift * DEG;
-        stepAnimFrame_ = 0;
-        stepAnimTimer_->start(20);
-
-        // 高亮配对
-        int outerIdx = ch.unicode() - 'A';
-        int innerIdx = (outerIdx + shift) % 26;
-
-        for (auto* l : outerLetters_) {
-            l->setDefaultTextColor(QColor(0, 200, 255));
-            l->setGraphicsEffect(nullptr);
-        }
-        for (auto* l : innerLetters_) {
-            l->setDefaultTextColor(QColor(255, 100, 50));
-            l->setGraphicsEffect(nullptr);
-        }
-
-        if (outerIdx >= 0 && outerIdx < outerLetters_.size()) {
-            outerLetters_[outerIdx]->setDefaultTextColor(QColor(255, 255, 0));
-            outerLetters_[outerIdx]->setGraphicsEffect(glow(QColor(255, 255, 0), 30));
-        }
-        if (innerIdx >= 0 && innerIdx < innerLetters_.size()) {
-            innerLetters_[innerIdx]->setDefaultTextColor(QColor(255, 255, 0));
-            innerLetters_[innerIdx]->setGraphicsEffect(glow(QColor(255, 255, 0), 30));
-        }
-
-        QChar enc = QChar('A' + innerIdx);
-        resultText_->setPlainText(resultText_->toPlainText() + enc);
-        qDebug() << "[Vigenere]" << highlightIndex_ << ":" << ch << "shift=" << shift << "->" << enc;
-    } else {
-        resultText_->setPlainText(resultText_->toPlainText() + ch);
-        highlightIndex_++;
-        return;
+    for (auto* l : innerLetters_) {
+        l->setDefaultTextColor(QColor(255, 100, 50));
+        l->setGraphicsEffect(nullptr);
     }
-
-    highlightShowing_ = true;
-    highlightTimer_->setInterval(animSpeed_);
 }
 
 void VigenereScene::animatePulse() {
@@ -273,9 +350,9 @@ void VigenereScene::animatePulse() {
 }
 
 void VigenereScene::reset() {
-    stepTimer_->stop();
-    stepAnimTimer_->stop();
-    highlightTimer_->stop();
+    rotateStepTimer_->stop();
+    rotateStepAnimTimer_->stop();
+    letterTimer_->stop();
     pulseTimer_->stop();
     clear();
     outerLetters_.clear();
@@ -284,20 +361,16 @@ void VigenereScene::reset() {
     innerRing_ = nullptr;
     resultText_ = nullptr;
     keywordDisplay_ = nullptr;
+    explanation_ = nullptr;
     currentRotation_ = 0;
     rotateStepIndex_ = 0;
-    highlightIndex_ = 0;
+    currentLetterIndex_ = 0;
     highlightShowing_ = false;
-    resultCharIndex_ = 0;
-    resultTarget_.clear();
-    typewriterActive_ = false;
+    resultString_.clear();
     shifts_.clear();
     animationId_++;
 }
 
 void VigenereScene::setSpeed(int ms) {
     animSpeed_ = ms;
-    if (highlightTimer_->isActive()) {
-        highlightTimer_->setInterval(ms);
-    }
 }

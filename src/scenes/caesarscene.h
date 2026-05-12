@@ -33,12 +33,14 @@ private:
     void clearHighlights();
     void startConnectionLineAnimation(int outerIdx, int innerIdx);
     void clearConnectionLines();
+    void showExplanation(const QString& text);
 
     QGraphicsEllipseItem* outerRing_ = nullptr;
     QGraphicsEllipseItem* innerRing_ = nullptr;
     QVector<QGraphicsTextItem*> outerLetters_;
     QVector<QGraphicsTextItem*> innerLetters_;
     QGraphicsTextItem* resultText_ = nullptr;
+    QGraphicsTextItem* explanation_ = nullptr;
     QVector<QGraphicsItem*> connectionLines_;
 
     QTimer* stepTimer_ = nullptr;      // 控制每格跳动的间隔
