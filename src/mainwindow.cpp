@@ -130,7 +130,7 @@ void MainWindow::onCaesarStart(const QString& text, int shift) {
 void MainWindow::onVigenereStart(const QString& text, const QString& keyword) {
     view_->setScene(vigenereScene_);
     vigenereScene_->startAnimation(text, keyword);
-    statusBar()->showMessage(QString("维吉尼亚密码: 关键词 %1").arg(keyword));
+    statusBar()->showMessage(QString("维吉尼亚密码: 密钥 %1").arg(keyword));
 }
 
 void MainWindow::onRSAKeyGen(int64_t p, int64_t q) {

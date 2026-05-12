@@ -104,7 +104,7 @@ void ControlPanel::setupVigenerePanel() {
     vigenereInput_ = new QLineEdit("HELLO");
     vigenereInput_->setFont(QFont("Menlo", 12));
     layout->addWidget(vigenereInput_);
-    auto* keyLabel = new QLabel("关键词 (字母):");
+    auto* keyLabel = new QLabel("密钥:");
     keyLabel->setFont(QFont("PingFang SC", 11));
     layout->addWidget(keyLabel);
     vigenereKey_ = new QLineEdit("KEY");

@@ -145,8 +145,8 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
     innerLabel->setPos(CX + R_INNER + 5, CY - 10);
     innerLabel->setZValue(2);
 
-    // 关键词显示
-    keywordDisplay_ = addText("KEY: " + keyword_, QFont("Menlo", 12, QFont::Bold));
+    // 密钥显示
+    keywordDisplay_ = addText("密钥: " + keyword_, QFont("Menlo", 12, QFont::Bold));
     keywordDisplay_->setDefaultTextColor(QColor(255, 200, 0));
     keywordDisplay_->setGraphicsEffect(glow(QColor(255, 200, 0), 10));
     keywordDisplay_->setPos(CX - 60, CY + R_OUTER + 15);
@@ -167,7 +167,7 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
     currentLetterIndex_ = 0;
 
     // 显示初始说明
-    showExplanation("维吉尼亚密码: 使用关键词对每个字母施加不同偏移量");
+    showExplanation("维吉尼亚密码: 使用密钥对每个字母施加不同偏移量");
 
     // 2 秒延迟后开始处理第一个字母（让用户有时间读说明）
     animationId_++;
