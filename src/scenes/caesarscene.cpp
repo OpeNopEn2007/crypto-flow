@@ -88,6 +88,9 @@ void CaesarScene::startAnimation(const QString& text, int shift) {
 void CaesarScene::animateStep() {
     if (currentStep_ >= inputText_.size()) {
         timer_->stop();
+        // 居中结果文字
+        QRectF rect = resultText_->boundingRect();
+        resultText_->setPos(CENTER_X - rect.width() / 2, CENTER_Y - rect.height() / 2);
         qInfo() << "[Caesar] Animation complete, result:" << resultText_->toPlainText();
         emit animationComplete();
         return;

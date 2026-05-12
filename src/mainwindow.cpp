@@ -153,3 +153,11 @@ void MainWindow::saveScreenshot(const QString& prefix) {
     image.save(filename);
     qInfo() << "Screenshot saved:" << filename;
 }
+
+void MainWindow::autoStartCaesar(const QString& text, int shift) {
+    onCaesarStart(text, shift);
+}
+
+void MainWindow::autoStartRSA() {
+    onRSAKeyGen(61, 53);
+}

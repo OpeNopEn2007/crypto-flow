@@ -4,6 +4,15 @@
 #include <QBrush>
 #include <QFont>
 #include <QDebug>
+#include <QGraphicsDropShadowEffect>
+
+static QGraphicsDropShadowEffect* createGlowEffect(QColor color, int blur = 15) {
+    auto* effect = new QGraphicsDropShadowEffect;
+    effect->setBlurRadius(blur);
+    effect->setColor(color);
+    effect->setOffset(0);
+    return effect;
+}
 
 RSAScene::RSAScene(QObject* parent)
     : QGraphicsScene(parent), timer_(new QTimer(this)) {
@@ -32,6 +41,7 @@ void RSAScene::addStep(const QString& desc, const QString& formula, const QStrin
     auto* valueItem = addText(value, QFont("Menlo", 13, QFont::Bold));
     valueItem->setPos(400, y + 25);
     valueItem->setDefaultTextColor(QColor(0, 255, 150));
+    valueItem->setGraphicsEffect(createGlowEffect(QColor(0, 255, 150), 10));
     valueItem->setZValue(1);
 
     steps_.append({label, formulaItem, valueItem, bg});

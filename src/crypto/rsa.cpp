@@ -70,7 +70,7 @@ int64_t RSAEngine::decrypt(int64_t cipher, int64_t d, int64_t n) {
 
 QVector<RSAStep> RSAEngine::keyGenSteps(int64_t p, int64_t q) {
     QVector<RSAStep> steps;
-    steps.append({"选择两个素数 p 和 q", "p, q", 0});
+    steps.append({"选择两个素数 p 和 q", QString("p = %1, q = %2").arg(p).arg(q), 0});
     steps.append({"计算 n = p × q", QString("n = %1 × %2").arg(p).arg(q), p * q});
 
     int64_t phi = (p - 1) * (q - 1);
@@ -86,7 +86,7 @@ QVector<RSAStep> RSAEngine::keyGenSteps(int64_t p, int64_t q) {
     steps.append({"计算私钥指数 d ≡ e⁻¹ (mod φ(n))",
                    QString("d = %1").arg(d), d});
 
-    steps.append({"公钥 (e, n)", QString("(%1, %2)").arg(e).arg(p * q), 0});
-    steps.append({"私钥 (d, n)", QString("(%1, %2)").arg(d).arg(p * q), 0});
+    steps.append({"公钥 (e, n)", QString("(%1, %2)").arg(e).arg(p * q), p * q});
+    steps.append({"私钥 (d, n)", QString("(%1, %2)").arg(d).arg(p * q), p * q});
     return steps;
 }

@@ -10,6 +10,8 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+    void autoStartCaesar(const QString& text, int shift);
+    void autoStartRSA();
 
 private slots:
     void switchToCaesar();
