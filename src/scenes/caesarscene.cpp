@@ -126,6 +126,23 @@ void CaesarScene::animateRotation() {
 }
 
 void CaesarScene::animateHighlight() {
+    if (highlightShowing_) {
+        // 阶段B：灭掉高亮，短暂亦顿后进入下一个字母
+        for (auto* letter : outerLetters_) {
+            letter->setDefaultTextColor(QColor(0, 200, 255));
+            letter->setGraphicsEffect(nullptr);
+        }
+        for (auto* letter : innerLetters_) {
+            letter->setDefaultTextColor(QColor(255, 100, 50));
+            letter->setGraphicsEffect(nullptr);
+        }
+        highlightShowing_ = false;
+        highlightIndex_++;
+        highlightTimer_->setInterval(150);  // 灭掉后短暂停顿
+        return;
+    }
+
+    // 检查是否完成
     if (highlightIndex_ >= inputText_.size()) {
         highlightTimer_->stop();
         QRectF rect = resultText_->boundingRect();
@@ -136,6 +153,7 @@ void CaesarScene::animateHighlight() {
         return;
     }
 
+    // 阶段A：亮起当前字母
     QChar ch = inputText_[highlightIndex_];
     if (ch.isLetter()) {
         int outerIdx = ch.unicode() - 'A';
@@ -146,8 +164,13 @@ void CaesarScene::animateHighlight() {
         qDebug() << "[Caesar] Highlight" << highlightIndex_ << ":" << ch << "->" << encrypted;
     } else {
         resultText_->setPlainText(resultText_->toPlainText() + ch);
+        // 非字母直接跳过，不停留
+        highlightIndex_++;
+        return;
     }
-    highlightIndex_++;
+
+    highlightShowing_ = true;
+    highlightTimer_->setInterval(animSpeed_);  // 亮起持续时间
 }
 
 void CaesarScene::highlightPair(int outerIdx, int innerIdx) {
@@ -181,6 +204,7 @@ void CaesarScene::reset() {
     resultText_ = nullptr;
     currentRotation_ = 0;
     highlightIndex_ = 0;
+    highlightShowing_ = false;
 }
 
 void CaesarScene::setSpeed(int ms) {

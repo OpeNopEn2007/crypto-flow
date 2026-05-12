@@ -43,4 +43,5 @@ private:
     double rotateStep_ = 0;
 
     int highlightIndex_ = 0;
+    bool highlightShowing_ = false;  // true=亮, false=灭
 };
