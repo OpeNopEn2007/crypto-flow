@@ -4,6 +4,11 @@
 #include <QtMath>
 #include <QDebug>
 
+static const double RADIUS_OUTER = 180;
+static const double RADIUS_INNER = 120;
+static const double CENTER_X = 300;
+static const double CENTER_Y = 250;
+
 static QGraphicsDropShadowEffect* createGlowEffect(QColor color, int blur = 15) {
     auto* effect = new QGraphicsDropShadowEffect;
     effect->setBlurRadius(blur);
@@ -12,15 +17,13 @@ static QGraphicsDropShadowEffect* createGlowEffect(QColor color, int blur = 15) 
     return effect;
 }
 
-static const double RADIUS_OUTER = 180;
-static const double RADIUS_INNER = 120;
-static const double CENTER_X = 300;
-static const double CENTER_Y = 250;
-
 CaesarScene::CaesarScene(QObject* parent)
-    : QGraphicsScene(parent), timer_(new QTimer(this)) {
+    : QGraphicsScene(parent)
+    , rotateTimer_(new QTimer(this))
+    , highlightTimer_(new QTimer(this)) {
     setSceneRect(0, 0, 600, 500);
-    connect(timer_, &QTimer::timeout, this, &CaesarScene::animateStep);
+    connect(rotateTimer_, &QTimer::timeout, this, &CaesarScene::animateRotation);
+    connect(highlightTimer_, &QTimer::timeout, this, &CaesarScene::animateHighlight);
 }
 
 void CaesarScene::drawOuterRing() {
@@ -45,12 +48,16 @@ void CaesarScene::drawOuterRing() {
 }
 
 void CaesarScene::drawInnerRing() {
+    // 创建内圈 group，方便整体旋转
+    innerGroup_ = createItemGroup({});
+
     innerRing_ = addEllipse(
         CENTER_X - RADIUS_INNER, CENTER_Y - RADIUS_INNER,
         RADIUS_INNER * 2, RADIUS_INNER * 2,
         QPen(QColor(255, 100, 50), 2));
     innerRing_->setZValue(0);
     innerRing_->setGraphicsEffect(createGlowEffect(QColor(255, 100, 50), 15));
+    innerGroup_->addToGroup(innerRing_);
 
     QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     for (int i = 0; i < 26; i++) {
@@ -61,8 +68,12 @@ void CaesarScene::drawInnerRing() {
         letter->setPos(x, y);
         letter->setDefaultTextColor(QColor(255, 100, 50));
         letter->setZValue(1);
+        innerGroup_->addToGroup(letter);
         innerLetters_.append(letter);
     }
+
+    // 保存原始变换
+    originalInnerTransform_ = innerGroup_->transform();
 }
 
 void CaesarScene::startAnimation(const QString& text, int shift) {
@@ -74,43 +85,81 @@ void CaesarScene::startAnimation(const QString& text, int shift) {
     drawOuterRing();
     drawInnerRing();
 
+    // 结果文字（初始隐藏，旋转完成后显示）
     resultText_ = addText("", QFont("Menlo", 20, QFont::Bold));
-    resultText_->setPos(CENTER_X - 80, CENTER_Y - 15);
     resultText_->setDefaultTextColor(QColor(0, 255, 150));
     resultText_->setZValue(5);
     resultText_->setGraphicsEffect(createGlowEffect(QColor(0, 255, 150), 20));
+    resultText_->setVisible(false);
 
-    currentStep_ = 0;
+    // 阶段1：旋转内圈
     currentRotation_ = 0;
-    timer_->start(animSpeed_);
+    targetRotation_ = shift_ * (360.0 / 26);  // 每个字母间距 = 360/26 度
+    rotateStep_ = targetRotation_ / 30.0;       // 分30步完成旋转
+    currentStep_ = 0;
+
+    qInfo() << "[Caesar] Rotation phase: target" << targetRotation_ << "degrees";
+    rotateTimer_->start(30);  // 每30ms旋转一步，共约900ms
 }
 
-void CaesarScene::animateStep() {
-    if (currentStep_ >= inputText_.size()) {
-        timer_->stop();
-        // 居中结果文字
+void CaesarScene::animateRotation() {
+    currentRotation_ += rotateStep_;
+
+    if (currentRotation_ >= targetRotation_) {
+        currentRotation_ = targetRotation_;
+        rotateTimer_->stop();
+
+        // 应用最终旋转
+        QTransform t;
+        t.translate(CENTER_X, CENTER_Y);
+        t.rotate(currentRotation_);
+        t.translate(-CENTER_X, -CENTER_Y);
+        innerGroup_->setTransform(t);
+
+        qInfo() << "[Caesar] Rotation complete, now highlighting letters";
+
+        // 阶段2：开始逐字母高亮
+        highlightIndex_ = 0;
+        highlightTimer_->start(animSpeed_);
+        return;
+    }
+
+    // 平滑旋转
+    QTransform t;
+    t.translate(CENTER_X, CENTER_Y);
+    t.rotate(currentRotation_);
+    t.translate(-CENTER_X, -CENTER_Y);
+    innerGroup_->setTransform(t);
+}
+
+void CaesarScene::animateHighlight() {
+    if (highlightIndex_ >= inputText_.size()) {
+        highlightTimer_->stop();
+        // 显示结果文字，居中
         QRectF rect = resultText_->boundingRect();
         resultText_->setPos(CENTER_X - rect.width() / 2, CENTER_Y - rect.height() / 2);
+        resultText_->setVisible(true);
         qInfo() << "[Caesar] Animation complete, result:" << resultText_->toPlainText();
         emit animationComplete();
         return;
     }
 
-    QChar ch = inputText_[currentStep_];
+    QChar ch = inputText_[highlightIndex_];
     if (ch.isLetter()) {
-        int idx = ch.unicode() - 'A';
-        highlightLetter(idx);
-        QChar encrypted = QChar('A' + (idx + shift_) % 26);
+        int outerIdx = ch.unicode() - 'A';
+        int innerIdx = (outerIdx + shift_) % 26;
+        highlightPair(outerIdx, innerIdx);
+        QChar encrypted = QChar('A' + innerIdx);
         resultText_->setPlainText(resultText_->toPlainText() + encrypted);
-        qDebug() << "[Caesar] Step" << currentStep_ << ":" << ch << "->" << encrypted;
+        qDebug() << "[Caesar] Highlight" << highlightIndex_ << ":" << ch << "->" << encrypted;
     } else {
         resultText_->setPlainText(resultText_->toPlainText() + ch);
     }
-    currentStep_++;
+    highlightIndex_++;
 }
 
-void CaesarScene::highlightLetter(int index) {
-    // 重置所有字母颜色
+void CaesarScene::highlightPair(int outerIdx, int innerIdx) {
+    // 重置所有颜色
     for (auto* letter : outerLetters_) {
         letter->setDefaultTextColor(QColor(0, 200, 255));
         letter->setGraphicsEffect(nullptr);
@@ -119,31 +168,36 @@ void CaesarScene::highlightLetter(int index) {
         letter->setDefaultTextColor(QColor(255, 100, 50));
         letter->setGraphicsEffect(nullptr);
     }
-    // 高亮当前字母 - 金色 + 强发光
-    if (index >= 0 && index < outerLetters_.size()) {
-        outerLetters_[index]->setDefaultTextColor(QColor(255, 255, 0));
-        outerLetters_[index]->setGraphicsEffect(createGlowEffect(QColor(255, 255, 0), 25));
-        int targetIdx = (index + shift_) % 26;
-        innerLetters_[targetIdx]->setDefaultTextColor(QColor(255, 255, 0));
-        innerLetters_[targetIdx]->setGraphicsEffect(createGlowEffect(QColor(255, 255, 0), 25));
+
+    // 高亮配对的字母 - 金色 + 强发光
+    if (outerIdx >= 0 && outerIdx < outerLetters_.size()) {
+        outerLetters_[outerIdx]->setDefaultTextColor(QColor(255, 255, 0));
+        outerLetters_[outerIdx]->setGraphicsEffect(createGlowEffect(QColor(255, 255, 0), 25));
+    }
+    if (innerIdx >= 0 && innerIdx < innerLetters_.size()) {
+        innerLetters_[innerIdx]->setDefaultTextColor(QColor(255, 255, 0));
+        innerLetters_[innerIdx]->setGraphicsEffect(createGlowEffect(QColor(255, 255, 0), 25));
     }
 }
 
 void CaesarScene::reset() {
-    timer_->stop();
+    rotateTimer_->stop();
+    highlightTimer_->stop();
     clear();
     outerLetters_.clear();
     innerLetters_.clear();
     outerRing_ = nullptr;
     innerRing_ = nullptr;
+    innerGroup_ = nullptr;
     resultText_ = nullptr;
     currentStep_ = 0;
     currentRotation_ = 0;
+    highlightIndex_ = 0;
 }
 
 void CaesarScene::setSpeed(int ms) {
     animSpeed_ = ms;
-    if (timer_->isActive()) {
-        timer_->setInterval(ms);
+    if (highlightTimer_->isActive()) {
+        highlightTimer_->setInterval(ms);
     }
 }
