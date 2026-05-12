@@ -54,8 +54,6 @@ void CaesarScene::drawInnerRing() {
         QPen(QColor(255, 100, 50), 2));
     innerRing_->setZValue(0);
     innerRing_->setGraphicsEffect(createGlowEffect(QColor(255, 100, 50), 15));
-
-    // 设置旋转锚点为圆心
     innerRing_->setTransformOriginPoint(CENTER_X, CENTER_Y);
 
     QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -71,14 +69,13 @@ void CaesarScene::drawInnerRing() {
     }
 }
 
-void CaesarScene::updateInnerLetterPositions(double rotationDeg) {
-    // 只旋转圆环，字母保持正立，只更新位置
-    innerRing_->setRotation(rotationDeg);
+void CaesarScene::setInnerRingRotation(double deg) {
+    // 旋转圆环
+    innerRing_->setRotation(deg);
 
-    double rotationRad = rotationDeg * M_PI / 180;
-    QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    // 字母跟着移动到旋转后的位置，但保持正立（不旋转字母本身）
     for (int i = 0; i < 26; i++) {
-        double angle = (i * 360.0 / 26 - 90 + rotationDeg) * M_PI / 180;
+        double angle = (i * 360.0 / 26 - 90 + deg) * M_PI / 180;
         double x = CENTER_X + RADIUS_INNER * 0.8 * cos(angle) - 8;
         double y = CENTER_Y + RADIUS_INNER * 0.8 * sin(angle) - 10;
         innerLetters_[i]->setPos(x, y);
@@ -94,40 +91,38 @@ void CaesarScene::startAnimation(const QString& text, int shift) {
     drawOuterRing();
     drawInnerRing();
 
-    // 结果文字
     resultText_ = addText("", QFont("Menlo", 20, QFont::Bold));
     resultText_->setDefaultTextColor(QColor(0, 255, 150));
     resultText_->setZValue(5);
     resultText_->setGraphicsEffect(createGlowEffect(QColor(0, 255, 150), 20));
     resultText_->setVisible(false);
 
-    // 阶段1：旋转内圈
+    // 逆时针旋转，让密文字母对齐明文字母
     currentRotation_ = 0;
-    targetRotation_ = shift_ * (360.0 / 26);
-    rotateStep_ = targetRotation_ / 30.0;
-    currentStep_ = 0;
+    targetRotation_ = -shift_ * (360.0 / 26);
+    rotateStep_ = targetRotation_ / 40.0;
 
     qInfo() << "[Caesar] Rotation phase: target" << targetRotation_ << "degrees";
-    rotateTimer_->start(30);
+    rotateTimer_->start(40);
 }
 
 void CaesarScene::animateRotation() {
     currentRotation_ += rotateStep_;
 
-    if (currentRotation_ >= targetRotation_) {
+    bool done = (rotateStep_ > 0) ? (currentRotation_ >= targetRotation_)
+                                   : (currentRotation_ <= targetRotation_);
+    if (done) {
         currentRotation_ = targetRotation_;
         rotateTimer_->stop();
-
-        updateInnerLetterPositions(currentRotation_);
-        qInfo() << "[Caesar] Rotation complete, now highlighting letters";
-
-        // 阶段2：逐字母高亮
-        highlightIndex_ = 0;
-        highlightTimer_->start(animSpeed_);
-        return;
     }
 
-    updateInnerLetterPositions(currentRotation_);
+    setInnerRingRotation(currentRotation_);
+
+    if (!rotateTimer_->isActive()) {
+        qInfo() << "[Caesar] Rotation complete, now highlighting letters";
+        highlightIndex_ = 0;
+        highlightTimer_->start(animSpeed_);
+    }
 }
 
 void CaesarScene::animateHighlight() {
@@ -184,7 +179,6 @@ void CaesarScene::reset() {
     outerRing_ = nullptr;
     innerRing_ = nullptr;
     resultText_ = nullptr;
-    currentStep_ = 0;
     currentRotation_ = 0;
     highlightIndex_ = 0;
 }

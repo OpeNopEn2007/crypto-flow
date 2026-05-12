@@ -23,7 +23,7 @@ private slots:
 private:
     void drawOuterRing();
     void drawInnerRing();
-    void updateInnerLetterPositions(double rotationDeg);
+    void setInnerRingRotation(double deg);
     void highlightPair(int outerIdx, int innerIdx);
 
     QGraphicsEllipseItem* outerRing_ = nullptr;
@@ -37,8 +37,7 @@ private:
 
     QString inputText_;
     int shift_ = 0;
-    int currentStep_ = 0;
-    int animSpeed_ = 300;
+    int animSpeed_ = 500;
     double currentRotation_ = 0;
     double targetRotation_ = 0;
     double rotateStep_ = 0;
