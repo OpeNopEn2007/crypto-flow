@@ -51,7 +51,7 @@ private:
 
     QString inputText_;
     int shift_ = 0;
-    int animSpeed_ = 800;
+    int animSpeed_ = 1000;
 
     // 逐格旋转
     double currentRotation_ = 0; // 当前总旋转角度
@@ -61,7 +61,7 @@ private:
     double stepToDeg_ = 0;      // 当前格目标角度
     int stepAnimFrame_ = 0;     // 当前格内动画帧
     static const int STEP_ANIM_FRAMES = 12; // 每格过渡帧数
-    static const int STEP_INTERVAL_MS = 300; // 每格之间的间隔
+    static const int STEP_INTERVAL_MS = 500; // 每格之间的间隔
 
     int highlightIndex_ = 0;
     bool highlightShowing_ = false;

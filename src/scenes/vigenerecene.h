@@ -47,7 +47,7 @@ private:
     QString inputText_;
     QString keyword_;
     QVector<int> shifts_;
-    int animSpeed_ = 800;
+    int animSpeed_ = 1000;
 
     // 当前正在处理的字母索引
     int currentLetterIndex_ = 0;
@@ -60,7 +60,7 @@ private:
     double stepToDeg_ = 0;
     int stepAnimFrame_ = 0;
     static const int STEP_ANIM_FRAMES = 12;
-    static const int STEP_INTERVAL_MS = 300;
+    static const int STEP_INTERVAL_MS = 500;
 
     // 高亮状态
     bool highlightShowing_ = false;

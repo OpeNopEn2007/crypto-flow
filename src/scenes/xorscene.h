@@ -26,5 +26,5 @@ private:
     QVector<QPair<QString, QPair<QString, QString>>> pendingSteps_;
     QVector<QColor> pendingAccents_;
     int currentStep_ = 0;
-    int animSpeed_ = 800;
+    int animSpeed_ = 1000;
 };

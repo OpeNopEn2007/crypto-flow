@@ -169,10 +169,10 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
     // 显示初始说明
     showExplanation("维吉尼亚密码: 使用关键词对每个字母施加不同偏移量");
 
-    // 1 秒延迟后开始处理第一个字母
+    // 2 秒延迟后开始处理第一个字母（让用户有时间读说明）
     animationId_++;
     int myId = animationId_;
-    QTimer::singleShot(1000, this, [this, myId]() {
+    QTimer::singleShot(2000, this, [this, myId]() {
         if (myId != animationId_) return;
         currentLetterIndex_ = 0;
         onLetterTick();
@@ -194,7 +194,11 @@ void VigenereScene::onLetterTick() {
 
         showExplanation("加密完成! 结果: " + resultString_);
         qInfo() << "[Vigenere] Complete, result:" << resultString_;
-        emit animationComplete();
+        // 延迟 1 秒再触发完成（让用户看到最终结果）
+        QTimer::singleShot(1000, this, [this, myId = animationId_]() {
+            if (myId != animationId_) return;
+            emit animationComplete();
+        });
         return;
     }
 
@@ -208,8 +212,8 @@ void VigenereScene::onLetterTick() {
         QRectF r = resultText_->boundingRect();
         resultText_->setPos(CX - r.width() / 2, CY - r.height() / 2);
         currentLetterIndex_++;
-        // 立即处理下一个
-        QTimer::singleShot(200, this, [this, myId = animationId_]() {
+        // 处理下一个
+        QTimer::singleShot(500, this, [this, myId = animationId_]() {
             if (myId == animationId_) onLetterTick();
         });
         return;
@@ -229,8 +233,11 @@ void VigenereScene::onLetterTick() {
     qInfo() << "[Vigenere] Letter" << currentLetterIndex_ << ":"
             << ch << "+ key" << keyCh << "(" << keyIdx << ")" << "->" << encrypted;
 
-    // 开始逐格旋转
-    startLetterRotation(keyIdx);
+    // 停顿 600ms 让用户读完说明，再开始旋转
+    QTimer::singleShot(600, this, [this, keyIdx, myId = animationId_]() {
+        if (myId != animationId_) return;
+        startLetterRotation(keyIdx);
+    });
 }
 
 void VigenereScene::startLetterRotation(int targetShift) {
@@ -251,11 +258,15 @@ void VigenereScene::startLetterRotation(int targetShift) {
 
         currentLetterIndex_++;
         highlightShowing_ = true;
-        QTimer::singleShot(animSpeed_, this, [this, myId = animationId_]() {
+        // 高亮停留后，再等 500ms 给用户反应时间
+        QTimer::singleShot(animSpeed_ + 500, this, [this, myId = animationId_]() {
             if (myId != animationId_) return;
             clearHighlights();
             highlightShowing_ = false;
-            onLetterTick();
+            QTimer::singleShot(500, this, [this, myId = animationId_]() {
+                if (myId != animationId_) return;
+                onLetterTick();
+            });
         });
         return;
     }
@@ -289,12 +300,15 @@ void VigenereScene::onRotateStepTick() {
         currentLetterIndex_++;
         highlightShowing_ = true;
 
-        // 高亮一段时间后清除并处理下一个
-        QTimer::singleShot(animSpeed_, this, [this, myId = animationId_]() {
+        // 高亮停留后，再等 500ms 给用户反应时间
+        QTimer::singleShot(animSpeed_ + 500, this, [this, myId = animationId_]() {
             if (myId != animationId_) return;
             clearHighlights();
             highlightShowing_ = false;
-            onLetterTick();
+            QTimer::singleShot(500, this, [this, myId = animationId_]() {
+                if (myId != animationId_) return;
+                onLetterTick();
+            });
         });
         return;
     }

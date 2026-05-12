@@ -36,10 +36,10 @@ ControlPanel::ControlPanel(QWidget* parent) : QWidget(parent) {
     auto* speedGroup = new QGroupBox("动画速度");
     auto* speedLayout = new QHBoxLayout(speedGroup);
     speedSlider_ = new QSlider(Qt::Horizontal);
-    speedSlider_->setRange(100, 1500);
-    speedSlider_->setValue(800);
+    speedSlider_->setRange(200, 2000);
+    speedSlider_->setValue(1000);
     speedSlider_->setInvertedAppearance(true);
-    speedLabel_ = new QLabel("800ms");
+    speedLabel_ = new QLabel("1000ms");
     connect(speedSlider_, &QSlider::valueChanged, this, [this](int val) {
         speedLabel_->setText(QString("%1ms").arg(val));
         emit speedChanged(val);

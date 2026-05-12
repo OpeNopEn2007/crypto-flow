@@ -150,10 +150,10 @@ void CaesarScene::startAnimation(const QString& text, int shift) {
     qInfo() << "[Caesar] Step rotation: " << rotateStepTotal_ << " steps,"
             << "interval:" << STEP_INTERVAL_MS << "ms";
 
-    // 1 秒延迟后开始第一格
+    // 2 秒延迟后开始第一格（让用户有时间读说明）
     animationId_++;
     int myId = animationId_;
-    QTimer::singleShot(1000, this, [this, myId]() {
+    QTimer::singleShot(2000, this, [this, myId]() {
         if (myId == animationId_) {
             onStepTick(); // 立即执行第一格
             if (rotateStepTotal_ > 0) {
@@ -167,9 +167,14 @@ void CaesarScene::onStepTick() {
     if (rotateStepIndex_ >= rotateStepTotal_) {
         stepTimer_->stop();
         qInfo() << "[Caesar] Step rotation complete, now highlighting letters";
+        showExplanation(QString("旋转完成! 内圈已偏移 %1 位, 开始逐字母加密").arg(shift_));
         highlightIndex_ = 0;
         highlightShowing_ = false;
-        highlightTimer_->start(animSpeed_);
+        // 停顿 500ms 让用户看到旋转结果，再开始高亮
+        QTimer::singleShot(500, this, [this, myId = animationId_]() {
+            if (myId != animationId_) return;
+            highlightTimer_->start(animSpeed_);
+        });
         return;
     }
 
@@ -231,7 +236,7 @@ void CaesarScene::animateHighlight() {
         clearConnectionLines();
         highlightShowing_ = false;
         highlightIndex_++;
-        highlightTimer_->setInterval(150);
+        highlightTimer_->setInterval(300);
         return;
     }
 
@@ -250,7 +255,7 @@ void CaesarScene::animateHighlight() {
         resultText_->setPos(CENTER_X - rect.width() / 2, CENTER_Y - rect.height() / 2);
 
         typewriterActive_ = true;
-        highlightTimer_->start(80);
+        highlightTimer_->start(100);
         showExplanation("加密完成! 结果: " + resultTarget_);
         return;
     }
