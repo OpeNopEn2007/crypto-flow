@@ -1,0 +1,367 @@
+% !TEX program = xelatex
+% CryptoFlow 实验报告 — 严格匹配原 docx 模板样式
+\documentclass[a4paper,UTF8]{ctexart}
+
+% ── 页面设置（与原 docx 一致：A4, 上下 2.54cm, 左右 3.05cm）──
+\usepackage[
+  top=2.54cm,
+  bottom=2.54cm,
+  left=3.05cm,
+  right=3.05cm
+]{geometry}
+
+% ── 字体：正文宋体+新罗马，封面标题 PingFang SC ──
+\setCJKmainfont{Songti SC}
+\setmainfont{Times New Roman}[
+  BoldFont=Times New Roman Bold,
+]
+% 封面标题用的无衬线字体
+\newCJKfontfamily\coverfont{PingFang SC}
+
+% ── 标题样式匹配原 docx ──
+% Heading 1: 22pt 粗体，段前 6mm 段后 6mm
+\ctexset{
+  section = {
+    format = \Large\bfseries,
+    beforeskip = 6mm,
+    afterskip = 6mm,
+    number = \chinese{section}、,
+    aftername = \,,
+  },
+  subsection = {
+    format = \large\bfseries,
+    beforeskip = 4mm,
+    afterskip = 4mm,
+  },
+  subsubsection = {
+    format = \normalsize\bfseries,
+    beforeskip = 3mm,
+    afterskip = 3mm,
+  },
+}
+
+% ── 正文设置 ──
+\setlength{\parindent}{2em}          % 首行缩进 2 字符
+\linespread{1.5}                     % 1.5 倍行距
+
+% ── 常用包 ──
+\usepackage{graphicx}
+\usepackage{booktabs}                % 三线表
+\usepackage{tabularx}
+\usepackage{enumitem}                % 列表定制
+\usepackage{listings}                % 代码高亮
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{amsmath,amssymb}
+
+% ── 代码字体：FiraCode ──
+\setmonofont{FiraCode Nerd Font Mono}
+
+% ── 代码样式 ──
+\lstset{
+  basicstyle=\small\ttfamily,
+  backgroundcolor=\color{gray!8},
+  frame=single,
+  breaklines=true,
+  columns=flexible,
+  keepspaces=true,
+}
+
+% ── 列表缩进 ──
+\setlist[enumerate]{leftmargin=4em}
+\setlist[itemize]{leftmargin=4em}
+
+% ── 页脚页码 ──
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% ── 封面页不显示页码 ──
+\fancypagestyle{cover}{
+  \fancyhf{}
+  \renewcommand{\headrulewidth}{0pt}
+  \renewcommand{\footrulewidth}{0pt}
+}
+
+\begin{document}
+
+% ═══════════════════════════════════════
+% 封面
+% ═══════════════════════════════════════
+\thispagestyle{cover}
+\begin{center}
+  \vspace*{3cm}
+
+  \vspace{2cm}
+  {\coverfont\LARGE\bfseries 高级语言程序设计}
+
+  \vspace{0.8cm}
+  {\coverfont\LARGE\bfseries 实验报告}
+
+  \vspace{3cm}
+  {\large
+    姓名：\underline{\quad 程至研 \quad} \\[1em]
+    学号：\underline{\quad 2512039 \quad} \\[1em]
+    班级：\underline{\qquad 1008 \qquad} \\[1em]
+    2026\ 年\ 5\ 月
+  }
+\end{center}
+
+\newpage
+
+% ═══════════════════════════════════════
+% 目录
+% ═══════════════════════════════════════
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════
+% 正文
+% ═══════════════════════════════════════
+
+\section{作业题目}
+
+交互式密码学原理可视化演示系统（CryptoFlow）
+
+本项目是一个基于 Qt\,6 的图形化密码学教学工具，通过交互式动画演示 5 种经典密码算法的加密/解密过程，帮助用户直观理解密码学原理。支持凯撒密码、维吉尼亚密码、RSA、Base64 编码和 XOR 加密。
+
+\section{开发软件}
+
+\begin{center}
+\begin{tabularx}{0.85\textwidth}{lX}
+\toprule
+\textbf{项目} & \textbf{说明} \\
+\midrule
+编程语言   & C++\,20 \\
+GUI 框架   & Qt\,6 \\
+构建系统   & CMake\,3.20+ \\
+开发环境   & macOS\;,\;\,VS Code \\
+版本管理   & Git\;,\;\,GitHub \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\section{课题要求}
+
+本课题要求使用 C++ 语言完成一个图形化小程序，具体要求如下：
+
+\begin{enumerate}[label=(\arabic*)]
+  \item 使用 C++ 图形化平台（本项目选用 Qt\,6）实现图形界面。
+  \item 程序内容具有创新性和实用性，能够直观展示密码学算法的工作原理。
+  \item 支持多种经典密码算法的可视化演示，用户可交互式地调整参数并观察加密过程。
+  \item 代码结构清晰，采用面向对象设计，算法层与界面层解耦。
+  \item 支持命令行自动演示模式，方便批量化展示。
+\end{enumerate}
+
+\section{主要流程}
+
+\subsection{整体架构}
+
+项目采用经典的 MVC 分层架构，将算法逻辑、可视化场景和用户控制面板分离：
+
+\begin{itemize}
+  \item \textbf{算法层}（\texttt{src/crypto/}）：纯计算逻辑，包含 Caesar、RSA、Vigenere 三个算法类，与 UI 完全解耦。
+  \item \textbf{场景层}（\texttt{src/scenes/}）：继承 QGraphicsScene，负责动画渲染。每个算法对应一个场景类，包括 CaesarScene、RSAScene、VigenereScene、Base64Scene、XORScene。
+  \item \textbf{控制面板}（\texttt{src/controlpanel.h/cpp}）：QStackedWidget 动态切换 5 种算法的参数控件，包含输入校验和速度调节。
+  \item \textbf{主窗口}（\texttt{src/mainwindow.h/cpp}）：QSplitter 左(3):右(1) 布局，左侧为动画场景，右侧为控制面板。
+\end{itemize}
+
+\textbf{整体数据流：}
+\begin{enumerate}
+  \item 用户在控制面板选择算法并输入参数
+  \item 控制面板校验输入合法性（素数检查、范围检查等）
+  \item 调用算法层进行加密/解密计算
+  \item 场景层根据计算步骤启动动画序列
+  \item 动画完成后自动截图保存
+\end{enumerate}
+
+\subsection{算法原理}
+
+\subsubsection{凯撒密码}
+
+凯撒密码是最经典的替换密码，通过将字母表中每个字母替换为固定偏移量后的字母实现加密。
+
+\textbf{加密公式：}
+\[
+  C = (P + \text{shift}) \bmod 26
+\]
+
+\textbf{解密公式：}
+\[
+  P = (C - \text{shift}) \bmod 26
+\]
+
+其中 $P$ 为明文字母对应的数字（A$=$0, B$=$1, \ldots），$C$ 为密文数字，$\text{shift}$ 为偏移量。
+
+\textbf{可视化实现：}采用双圈转盘设计。外圈固定显示标准字母表（明文），内圈显示偏移后的字母表（密文）。动画时内圈逆时针旋转对齐到指定偏移量，然后逐字母高亮显示加密映射关系，同时用连接线和脉冲发光效果展示对应关系。
+
+\subsubsection{维吉尼亚密码}
+
+维吉尼亚密码是凯撒密码的多表扩展，使用一个关键词循环作为偏移量序列，不同位置的字母使用不同的偏移量，大幅提高了密码强度。
+
+\textbf{加密公式：}
+\[
+  C_i = (P_i + K_{i \bmod L}) \bmod 26
+\]
+
+其中 $K$ 为关键词字母序列，$L$ 为关键词长度。
+
+\textbf{可视化实现：}同样使用双圈转盘，但内圈偏移量会根据关键词的每个字母动态切换。关键词以黄色高亮显示在顶部，每处理一个明文字母，内圈旋转到对应密钥字母的偏移位置，处理完成后回转复位再处理下一个。密钥索引只对字母字符递增，非字母（空格、标点）不消耗密钥位。
+
+\subsubsection{RSA}
+
+RSA 是最著名的非对称加密算法，基于大整数分解的数学难题。其安全性依赖于：将两个大素数相乘很容易，但将乘积分解回两个素数极其困难。
+
+\textbf{密钥生成步骤：}
+\begin{enumerate}
+  \item 选择两个不相等的大素数 $p$ 和 $q$
+  \item 计算 $n = p \times q$（模数）
+  \item 计算欧拉函数 $\varphi(n) = (p-1)(q-1)$
+  \item 选择公钥指数 $e$，满足 $1 < e < \varphi(n)$ 且 $\gcd(e, \varphi(n)) = 1$
+  \item 计算私钥指数 $d$，满足 $d \times e \equiv 1 \pmod{\varphi(n)}$，即 $d = e^{-1} \bmod \varphi(n)$
+  \item 公钥 $= (e, n)$，私钥 $= (d, n)$
+\end{enumerate}
+
+\textbf{加密：}$C = M^e \bmod n$
+
+\textbf{解密：}$M = C^d \bmod n$
+
+\textbf{可视化实现：}采用 7 步卡片流程动画，每一步展示密钥生成的一个阶段。居中卡片布局，圆形步骤编号，关键数值以绿色高亮显示。加密后自动将密文存入缓存，切换到解密模式时自动填充，方便用户理解加解密的对称性。模幂运算使用 \texttt{\_\_int128} 中间变量防止 64 位整数乘法溢出。
+
+\subsubsection{Base64 编码}
+
+Base64 是一种将二进制数据编码为 ASCII 字符的编码方式，常用于在仅支持文本的传输通道中安全地传递二进制数据。
+
+\textbf{编码过程：}
+\begin{enumerate}
+  \item 将输入文本转换为 ASCII 码的二进制表示
+  \item 每 8 位一组重新划分为每 6 位一组
+  \item 将每组 6 位二进制转换为十进制数（0--63）
+  \item 按照 Base64 编码表映射为对应的 ASCII 字符
+  \item 输出长度不是 4 的倍数时，用 ``='' 填充
+\end{enumerate}
+
+\textbf{可视化实现：}5 步卡片流程，展示明文 $\to$ 二进制 $\to$ 6bit 分组 $\to$ 查表 $\to$ 最终结果的完整转换过程，与 RSA 场景共享卡片布局风格。
+
+\subsubsection{XOR 加密}
+
+XOR（异或）加密是最简单的对称加密算法，利用异或运算的自反性：$A \oplus K = C$，$C \oplus K = A$。加密和解密使用完全相同的操作。
+
+\textbf{逐字节运算：}
+\[
+  \text{密文字节} = \text{明文字节} \oplus \text{密钥字节}
+\]
+
+\textbf{可视化实现：}4 步卡片流程，分别展示明文、密钥、逐字节 XOR 运算过程和加密结果。同时以二进制形式展示每一字节的异或运算细节。
+
+\subsection{动画系统设计}
+
+动画系统是本项目的核心难点之一。由于 QGraphicsItem 不支持 QPropertyAnimation，因此采用 QTimer\;+\;QEasingCurve 的手动动画方案：
+
+\begin{itemize}
+  \item \textbf{离散步进旋转：}每步 500\,ms 暂停 + 12 帧 OutCubic 缓动旋转，让用户看清每一步变化。
+  \item \textbf{animationId\_ 防并发：}每次启动动画时递增 ID，所有 QTimer::singleShot 回调执行前校验 ID，过期则丢弃，避免旧动画回调干扰新动画。
+  \item \textbf{回转复位机制：}旋转完成后匀速回转初始位置（30 帧线性），停顿 500\,ms 后再开始逐字母高亮。
+  \item \textbf{内圈字母：}不使用 QGraphicsItemGroup（旋转会导致字母倾斜），而是手动用 cos/sin 重新计算每个字母的位置。
+  \item \textbf{脉冲发光效果：}用 QGraphicsEllipseItem\;+\;QLinearGradient 实现连接线端点的发光动画。
+\end{itemize}
+
+\section{单元测试}
+
+本项目的算法层（\texttt{src/crypto/}）设计为纯计算逻辑，与 UI 完全解耦，便于独立测试。以下是各算法的关键测试用例：
+
+\textbf{凯撒密码测试}
+
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+\textbf{输入} & \textbf{偏移量} & \textbf{预期输出} \\
+\midrule
+HELLO & 3  & KHOOR \\
+WORLD & 5  & BTWQI \\
+ABC   & 25 & ZAB   \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{RSA 测试}
+
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+\textbf{p} & \textbf{q} & \textbf{验证} \\
+\midrule
+61 & 53 & $n=3233,\ \varphi=3120,\ e=17,\ d=2753$ \\
+7  & 11 & $n=77,\ \varphi=60,\ e=13,\ d=37$         \\
+13 & 17 & $n=221,\ \varphi=192,\ e=5,\ d=77$         \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{维吉尼亚密码测试}
+
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+\textbf{明文} & \textbf{密钥} & \textbf{密文} \\
+\midrule
+HELLO  & KEY   & RIJVS \\
+ATTACK & LEMON & LXFOPV \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+此外，ControlPanel 中对所有算法的输入都进行了校验：
+
+\begin{itemize}
+  \item RSA：p、q 必须为素数且不相等，$p, q \ge 3$
+  \item RSA 加密：明文 $M$ 必须满足 $0 \le M < n$
+  \item 维吉尼亚/XOR：密钥和输入不能为空
+  \item Base64：输入不能为空
+  \item CLI \texttt{--shift} 越界时默认回退到 3
+\end{itemize}
+
+\section{AI 工具使用说明}
+
+本项目开发过程中使用了以下 AI 工具：
+
+\begin{center}
+\begin{tabularx}{0.9\textwidth}{lXX}
+\toprule
+\textbf{工具/模型名称} & \textbf{用途} & \textbf{使用位置} \\
+\midrule
+DeepSeek V4 Pro & 设计阶段的算法思路讨论、架构设计建议 & 项目整体架构与算法设计 \\
+Mimo V2.5 Pro & 代码开发辅助、架构设计、Bug 调试 & 源代码          \\
+Claude Code    & 自动化代码生成、重构、测试         & 项目架构与分步开发 \\
+GitHub Copilot       & 代码补全                           & 部分代码编写        \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+说明：项目从零开始由 AI 辅助完成。算法设计思路、Qt 动画方案、架构分层均由开发者主导，AI 主要用于代码实现、调试和优化。所有代码经过人工审查和实际运行验证。
+
+\section{收获}
+
+\subsection{Qt\,6 图形编程}
+
+通过本项目深入学习了 Qt\,6 的 QGraphicsView/QGraphicsScene 框架。理解了 Qt 的坐标系统、信号槽机制、QTimer 定时器的使用方式。特别是 QGraphicsItem 不支持属性动画这一限制，学会了用 QTimer\;+\;QEasingCurve 手动实现平滑动画的方案。
+
+\subsection{面向对象设计}
+
+项目严格遵循面向对象原则：算法层与视图层分离，每个密码算法都有独立的算法类和场景类。这种分层设计使得添加新算法只需实现对应的 \texttt{crypto} 和 \texttt{scenes} 类，无需修改主窗口和控制面板的核心逻辑。
+
+\subsection{动画系统设计}
+
+动画系统的并发控制是一个重要收获。\texttt{animationId\_} 机制解决了多个动画回调互相干扰的问题，回转复位机制确保场景状态的正确性。这些设计模式在后续的图形编程中都会用到。
+
+\subsection{密码学原理}
+
+通过可视化实现加深了对密码学原理的理解。凯撒密码和维吉尼亚密码让我理解了古典密码的替换思想及其局限性；RSA 算法让我接触了模运算、欧拉函数、模逆元等数论知识；Base64 编码让我理解了二进制数据与文本之间的转换方式。
+
+\subsection{C++ 工程实践}
+
+学习了 CMake 构建系统的配置、Qt 的 MOC/UIC/RCC 机制、跨平台编译的注意事项（如 MSVC 对 \texttt{\_\_int128} 的兼容处理）。也学会了使用 Git 进行版本管理、GitHub Actions 进行 CI/CD 自动化构建。
+
+\end{document}
