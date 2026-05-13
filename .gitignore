@@ -7,6 +7,9 @@ compile_commands.json
 *.app
 .DS_Store
 
+# Reports (personal info)
+docs/reports/
+
 # Debug artifacts
 *_screenshot.png
 *.log
