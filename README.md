@@ -92,6 +92,17 @@ src/
 resources/
 ├── resources.qrc         # Qt 资源文件
 └── style.qss             # 深色科技主题样式
+display/                  # 视频制作
+├── script.md             # 视频脚本（时间轴、字幕、操作说明）
+├── subtitles.srt         # 字幕文件
+├── record.sh             # 录制所有片段
+├── compose.sh            # 合成最终视频
+├── fragments/            # 录制的视频片段
+└── output/               # 最终输出
+reports/                  # 实验报告（LaTeX）
+├── report.tex            # 报告源文件
+├── Makefile              # 编译脚本
+└── 2512039_程至研.pdf     # 生成的 PDF
 ```
 
 ## 架构设计

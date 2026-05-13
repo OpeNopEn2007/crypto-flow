@@ -41,6 +41,17 @@ src/
     └── xorscene.h/cpp     # XOR 加密可视化场景
 resources/
 └── style.qss             # 深色主题样式
+display/                  # 视频制作
+├── script.md             # 视频脚本（时间轴、字幕、操作说明）
+├── subtitles.srt         # 字幕文件
+├── record.sh             # 录制所有片段
+├── compose.sh            # 合成最终视频
+├── fragments/            # 录制的视频片段
+└── output/               # 最终输出
+reports/                  # 实验报告（LaTeX）
+├── report.tex            # 报告源文件
+├── Makefile              # 编译脚本
+└── 2512039_程至研.pdf     # 生成的 PDF
 ```
 
 ### 架构要点
@@ -76,3 +87,14 @@ resources/
 - 日志输出到 `cryptoflow.log` + stderr
 - 动画完成后自动截图 `caesar_screenshot.png` / `rsa_screenshot.png` / `vigenere_screenshot.png` / `xor_screenshot.png`
 - CLI 参数支持自动启动演示
+
+### 视频制作
+- 脚本位置：`display/script.md`
+- 字幕文件：`display/subtitles.srt`
+- 合成命令：`cd display && ./compose.sh`
+- 输出位置：`display/output/CryptoFlow_demo.mp4`
+
+### 实验报告
+- 源文件：`reports/report.tex`
+- 编译命令：`cd reports && make`
+- 输出位置：`reports/2512039_程至研.pdf`
