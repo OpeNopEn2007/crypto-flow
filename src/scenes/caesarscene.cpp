@@ -22,12 +22,14 @@ CaesarScene::CaesarScene(QObject* parent)
     : QGraphicsScene(parent)
     , stepTimer_(new QTimer(this))
     , stepAnimTimer_(new QTimer(this))
+    , rewindTimer_(new QTimer(this))
     , highlightTimer_(new QTimer(this))
     , pulseTimer_(new QTimer(this))
     , connectionAnimTimer_(new QTimer(this)) {
     setSceneRect(0, 0, 600, 500);
     connect(stepTimer_, &QTimer::timeout, this, &CaesarScene::onStepTick);
     connect(stepAnimTimer_, &QTimer::timeout, this, &CaesarScene::onStepAnimTick);
+    connect(rewindTimer_, &QTimer::timeout, this, &CaesarScene::onRewindTick);
     connect(highlightTimer_, &QTimer::timeout, this, &CaesarScene::animateHighlight);
     connect(pulseTimer_, &QTimer::timeout, this, &CaesarScene::animatePulse);
     connect(connectionAnimTimer_, &QTimer::timeout, this, &CaesarScene::animateConnectionLine);
@@ -107,60 +109,43 @@ void CaesarScene::setInnerRingRotation(double deg) {
 }
 
 void CaesarScene::startAnimation(const QString& text, int shift) {
-    reset();
-    inputText_ = text.toUpper();
-    shift_ = ((shift % 26) + 26) % 26;
+    QString newText = text.toUpper();
+    int newShift = ((shift % 26) + 26) % 26;
+
+    // 如果 rewind 正在进行，只更新 pending 参数，不打断当前 rewind
+    if (rewindTimer_->isActive()) {
+        qInfo() << "[Caesar] Rewind in progress, queuing new animation";
+        pendingText_ = newText;
+        pendingShift_ = newShift;
+        return;
+    }
+
+    // 先废除所有旧动画的 singleShot 回调
+    animationId_++;
+    stepTimer_->stop();
+    stepAnimTimer_->stop();
+    rewindTimer_->stop();
+    highlightTimer_->stop();
+    pulseTimer_->stop();
+
+    inputText_ = newText;
+    shift_ = newShift;
     qInfo() << "[Caesar] Starting animation, text:" << inputText_ << "shift:" << shift_;
 
-    drawOuterRing();
-    drawInnerRing();
+    // 如果内圈还在非零位置，先回转再启动新动画
+    if (qAbs(currentRotation_) > 0.1 && innerRing_) {
+        qInfo() << "[Caesar] Inner ring at" << currentRotation_ << "deg, rewinding first";
+        showExplanation("正在复位内圈...");
+        pendingText_ = inputText_;
+        pendingShift_ = shift_;
+        rewindFromDeg_ = currentRotation_;
+        rewindFrame_ = 0;
+        rewindTimer_->start(20);
+        return;
+    }
 
-    auto* outerLabel = addText("明文", QFont("PingFang SC", 10));
-    outerLabel->setDefaultTextColor(QColor(0, 200, 255, 180));
-    outerLabel->setPos(CENTER_X + RADIUS_OUTER + 5, CENTER_Y - 10);
-    outerLabel->setZValue(2);
-
-    auto* innerLabel = addText("密文", QFont("PingFang SC", 10));
-    innerLabel->setDefaultTextColor(QColor(255, 100, 50, 180));
-    innerLabel->setPos(CENTER_X + RADIUS_INNER + 5, CENTER_Y - 10);
-    innerLabel->setZValue(2);
-
-    resultText_ = addText("", QFont("Menlo", 22, QFont::Bold));
-    resultText_->setDefaultTextColor(QColor(0, 255, 150));
-    resultText_->setZValue(5);
-    resultText_->setGraphicsEffect(createGlowEffect(QColor(0, 255, 150), 20));
-    resultText_->setVisible(false);
-    resultTarget_ = "";
-    resultCharIndex_ = 0;
-    typewriterActive_ = false;
-
-    // 初始说明
-    showExplanation(QString("凯撒密码: 每个字母后移 %1 位 (A→%2)")
-        .arg(shift_).arg(QChar('A' + shift_)));
-
-    pulsePhase_ = 0;
-    pulseTimer_->start(50);
-
-    // 逐格旋转设置
-    currentRotation_ = 0;
-    rotateStepIndex_ = 0;
-    rotateStepTotal_ = shift_;
-    stepFromDeg_ = 0;
-
-    qInfo() << "[Caesar] Step rotation: " << rotateStepTotal_ << " steps,"
-            << "interval:" << STEP_INTERVAL_MS << "ms";
-
-    // 2 秒延迟后开始第一格（让用户有时间读说明）
-    animationId_++;
-    int myId = animationId_;
-    QTimer::singleShot(2000, this, [this, myId]() {
-        if (myId == animationId_) {
-            onStepTick(); // 立即执行第一格
-            if (rotateStepTotal_ > 0) {
-                stepTimer_->start(STEP_INTERVAL_MS);
-            }
-        }
-    });
+    reset();
+    launchAnimation();
 }
 
 void CaesarScene::onStepTick() {
@@ -180,7 +165,7 @@ void CaesarScene::onStepTick() {
 
     // 计算当前格的起止角度
     stepFromDeg_ = currentRotation_;
-    stepToDeg_ = -(rotateStepIndex_ + 1) * DEG_PER_LETTER;
+    stepToDeg_ = rotateDirection_ * -(rotateStepIndex_ + 1) * DEG_PER_LETTER;
     stepAnimFrame_ = 0;
 
     rotateStepIndex_++;
@@ -213,6 +198,91 @@ void CaesarScene::onStepAnimTick() {
     }
 
     setInnerRingRotation(currentRotation_);
+}
+
+void CaesarScene::onRewindTick() {
+    rewindFrame_++;
+    double t = static_cast<double>(rewindFrame_) / REWIND_FRAMES;
+    if (t >= 1.0) t = 1.0;
+
+    currentRotation_ = rewindFromDeg_ * (1.0 - t);
+    setInnerRingRotation(currentRotation_);
+
+    if (rewindFrame_ >= REWIND_FRAMES) {
+        rewindTimer_->stop();
+        currentRotation_ = 0;
+        setInnerRingRotation(0);
+        qInfo() << "[Caesar] Rewind complete, starting pending animation";
+        showExplanation("复位完成, 开始新的加密");
+
+        // 用待处理的参数启动新动画
+        inputText_ = pendingText_;
+        shift_ = pendingShift_;
+        pendingText_.clear();
+
+        // 停顿 300ms 再启动新动画（必须先 reset 清理旧场景）
+        QTimer::singleShot(300, this, [this, myId = animationId_]() {
+            if (myId != animationId_) return;
+            reset();
+            launchAnimation();
+        });
+    }
+}
+
+void CaesarScene::launchAnimation() {
+    drawOuterRing();
+    drawInnerRing();
+
+    auto* outerLabel = addText("明文", QFont("PingFang SC", 10));
+    outerLabel->setDefaultTextColor(QColor(0, 200, 255, 180));
+    outerLabel->setPos(CENTER_X + RADIUS_OUTER + 5, CENTER_Y - 10);
+    outerLabel->setZValue(2);
+
+    auto* innerLabel = addText("密文", QFont("PingFang SC", 10));
+    innerLabel->setDefaultTextColor(QColor(255, 100, 50, 180));
+    innerLabel->setPos(CENTER_X + RADIUS_INNER + 5, CENTER_Y - 10);
+    innerLabel->setZValue(2);
+
+    resultText_ = addText("", QFont("Menlo", 22, QFont::Bold));
+    resultText_->setDefaultTextColor(QColor(0, 255, 150));
+    resultText_->setZValue(5);
+    resultText_->setGraphicsEffect(createGlowEffect(QColor(0, 255, 150), 20));
+    resultText_->setVisible(false);
+    resultTarget_ = "";
+    resultCharIndex_ = 0;
+    typewriterActive_ = false;
+
+    showExplanation(QString("凯撒密码: 每个字母后移 %1 位 (A→%2)")
+        .arg(shift_).arg(QChar('A' + shift_)));
+
+    pulsePhase_ = 0;
+    pulseTimer_->start(50);
+
+    currentRotation_ = 0;
+    rotateStepIndex_ = 0;
+    // 偏移 >= 14 时反向旋转更快（如 14→顺时针12步, 22→顺时针4步）
+    if (shift_ > 13) {
+        rotateStepTotal_ = 26 - shift_;
+        rotateDirection_ = -1;
+    } else {
+        rotateStepTotal_ = shift_;
+        rotateDirection_ = 1;
+    }
+    stepFromDeg_ = 0;
+
+    qInfo() << "[Caesar] Step rotation: " << rotateStepTotal_ << " steps,"
+            << "direction:" << (rotateDirection_ > 0 ? "CCW" : "CW")
+            << "interval:" << STEP_INTERVAL_MS << "ms";
+
+    int myId = animationId_;
+    QTimer::singleShot(2000, this, [this, myId]() {
+        if (myId == animationId_) {
+            onStepTick();
+            if (rotateStepTotal_ > 0) {
+                stepTimer_->start(STEP_INTERVAL_MS);
+            }
+        }
+    });
 }
 
 void CaesarScene::animateHighlight() {
@@ -385,6 +455,7 @@ void CaesarScene::showExplanation(const QString& text) {
 void CaesarScene::reset() {
     stepTimer_->stop();
     stepAnimTimer_->stop();
+    rewindTimer_->stop();
     highlightTimer_->stop();
     pulseTimer_->stop();
     connectionAnimTimer_->stop();
@@ -399,13 +470,13 @@ void CaesarScene::reset() {
     currentRotation_ = 0;
     rotateStepIndex_ = 0;
     rotateStepTotal_ = 0;
+    rotateDirection_ = 1;
     highlightIndex_ = 0;
     highlightShowing_ = false;
     connAnimProgress_ = 0;
     resultCharIndex_ = 0;
     resultTarget_.clear();
     typewriterActive_ = false;
-    animationId_++;
 }
 
 void CaesarScene::setSpeed(int ms) {

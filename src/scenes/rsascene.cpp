@@ -8,11 +8,11 @@
 #include <QGraphicsRectItem>
 
 static const double SCENE_W = 600;
-static const double CARD_W = 460;
-static const double CARD_H = 52;
+static const double CARD_W = 520;
+static const double CARD_H = 60;
 static const double CARD_X = (SCENE_W - CARD_W) / 2;
-static const double CARD_SPACING = 60;
-static const double START_Y = 45;
+static const double CARD_SPACING = 72;
+static const double START_Y = 58;
 
 static QGraphicsDropShadowEffect* createGlowEffect(QColor color, int blur = 15) {
     auto* effect = new QGraphicsDropShadowEffect;
@@ -32,7 +32,7 @@ static QGraphicsDropShadowEffect* createShadowEffect() {
 
 RSAScene::RSAScene(QObject* parent)
     : QGraphicsScene(parent), timer_(new QTimer(this)) {
-    setSceneRect(0, 0, SCENE_W, 500);
+    setSceneRect(0, 0, SCENE_W, 600);
     connect(timer_, &QTimer::timeout, this, &RSAScene::animateStep);
 }
 
@@ -61,34 +61,34 @@ void RSAScene::addStep(const QString& desc, const QString& formula, const QStrin
     bar->setGraphicsEffect(createGlowEffect(accent, 10));
 
     // 步骤编号 — 圆形背景
-    double numX = CARD_X + 16;
-    double numY = y + CARD_H / 2 - 10;
-    auto* numBg = addEllipse(numX - 2, numY - 2, 24, 24,
+    double numX = CARD_X + 20;
+    double numY = y + CARD_H / 2 - 11;
+    auto* numBg = addEllipse(numX - 2, numY - 2, 30, 30,
                               QPen(accent, 1.5), QBrush(QColor(0, 0, 0, 150)));
     numBg->setZValue(1);
-    auto* numItem = addText(QString("%1").arg(stepNum), QFont("Menlo", 10, QFont::Bold));
-    numItem->setPos(numX + 2, numY);
+    auto* numItem = addText(QString("%1").arg(stepNum), QFont("Menlo", 14, QFont::Bold));
+    numItem->setPos(numX + 4, numY);
     numItem->setDefaultTextColor(accent);
     numItem->setZValue(2);
 
     // 描述文字 — 灰白色
-    auto* label = addText(desc, QFont("PingFang SC", 11));
-    label->setPos(CARD_X + 50, y + 5);
+    auto* label = addText(desc, QFont("PingFang SC", 16));
+    label->setPos(CARD_X + 60, y + 6);
     label->setDefaultTextColor(QColor(220, 220, 230));
     label->setZValue(1);
 
     // 公式 — 亮蓝色，稍小
-    auto* formulaItem = addText(formula, QFont("Menlo", 11, QFont::Bold));
-    formulaItem->setPos(CARD_X + 50, y + 26);
+    auto* formulaItem = addText(formula, QFont("Menlo", 14, QFont::Bold));
+    formulaItem->setPos(CARD_X + 60, y + 32);
     formulaItem->setDefaultTextColor(QColor(80, 200, 255));
     formulaItem->setZValue(1);
 
     // 结果值 — 右侧，绿色发光
     QGraphicsTextItem* valueItem = nullptr;
     if (!value.isEmpty()) {
-        valueItem = addText(value, QFont("Menlo", 14, QFont::Bold));
+        valueItem = addText(value, QFont("Menlo", 20, QFont::Bold));
         double valW = valueItem->boundingRect().width();
-        valueItem->setPos(CARD_X + CARD_W - valW - 20, y + CARD_H / 2 - 10);
+        valueItem->setPos(CARD_X + CARD_W - valW - 25, y + 18);
         valueItem->setDefaultTextColor(QColor(0, 255, 140));
         valueItem->setGraphicsEffect(createGlowEffect(QColor(0, 255, 140), 15));
         valueItem->setZValue(1);
@@ -118,15 +118,15 @@ void RSAScene::startKeyGen(int64_t p, int64_t q) {
     qInfo() << "[RSA] Starting key generation, p:" << p << "q:" << q;
 
     // 标题
-    auto* title = addText("RSA 密钥生成", QFont("PingFang SC", 18, QFont::Bold));
+    auto* title = addText("RSA 密钥生成", QFont("PingFang SC", 26, QFont::Bold));
     title->setDefaultTextColor(QColor(0, 210, 255));
     title->setGraphicsEffect(createGlowEffect(QColor(0, 210, 255), 20));
     QRectF titleRect = title->boundingRect();
     title->setPos((SCENE_W - titleRect.width()) / 2, 10);
 
     // 标题下划线
-    auto* underline = addLine((SCENE_W - titleRect.width()) / 2, 38,
-                               (SCENE_W + titleRect.width()) / 2, 38,
+    auto* underline = addLine((SCENE_W - titleRect.width()) / 2, 48,
+                               (SCENE_W + titleRect.width()) / 2, 48,
                                QPen(QColor(0, 210, 255, 80), 1));
     underline->setZValue(0);
 
@@ -157,14 +157,14 @@ void RSAScene::startKeyGen(int64_t p, int64_t q) {
 void RSAScene::startEncrypt(int64_t message, int64_t e, int64_t n) {
     reset();
 
-    auto* title = addText("RSA 加密", QFont("PingFang SC", 18, QFont::Bold));
+    auto* title = addText("RSA 加密", QFont("PingFang SC", 26, QFont::Bold));
     title->setDefaultTextColor(QColor(0, 210, 255));
     title->setGraphicsEffect(createGlowEffect(QColor(0, 210, 255), 20));
     QRectF titleRect = title->boundingRect();
     title->setPos((SCENE_W - titleRect.width()) / 2, 10);
 
-    auto* underline = addLine((SCENE_W - titleRect.width()) / 2, 38,
-                               (SCENE_W + titleRect.width()) / 2, 38,
+    auto* underline = addLine((SCENE_W - titleRect.width()) / 2, 48,
+                               (SCENE_W + titleRect.width()) / 2, 48,
                                QPen(QColor(0, 210, 255, 80), 1));
 
     int64_t cipher = RSAEngine::encrypt(message, e, n);
@@ -183,14 +183,14 @@ void RSAScene::startEncrypt(int64_t message, int64_t e, int64_t n) {
 void RSAScene::startDecrypt(int64_t cipher, int64_t d, int64_t n) {
     reset();
 
-    auto* title = addText("RSA 解密", QFont("PingFang SC", 18, QFont::Bold));
+    auto* title = addText("RSA 解密", QFont("PingFang SC", 26, QFont::Bold));
     title->setDefaultTextColor(QColor(0, 210, 255));
     title->setGraphicsEffect(createGlowEffect(QColor(0, 210, 255), 20));
     QRectF titleRect = title->boundingRect();
     title->setPos((SCENE_W - titleRect.width()) / 2, 10);
 
-    auto* underline = addLine((SCENE_W - titleRect.width()) / 2, 38,
-                               (SCENE_W + titleRect.width()) / 2, 38,
+    auto* underline = addLine((SCENE_W - titleRect.width()) / 2, 48,
+                               (SCENE_W + titleRect.width()) / 2, 48,
                                QPen(QColor(0, 210, 255, 80), 1));
 
     int64_t message = RSAEngine::decrypt(cipher, d, n);

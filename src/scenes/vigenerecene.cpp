@@ -23,11 +23,13 @@ VigenereScene::VigenereScene(QObject* parent)
     : QGraphicsScene(parent)
     , rotateStepTimer_(new QTimer(this))
     , rotateStepAnimTimer_(new QTimer(this))
+    , rewindTimer_(new QTimer(this))
     , letterTimer_(new QTimer(this))
     , pulseTimer_(new QTimer(this)) {
     setSceneRect(0, 0, 600, 500);
     connect(rotateStepTimer_, &QTimer::timeout, this, &VigenereScene::onRotateStepTick);
     connect(rotateStepAnimTimer_, &QTimer::timeout, this, &VigenereScene::onRotateStepAnimTick);
+    connect(rewindTimer_, &QTimer::timeout, this, &VigenereScene::onRewindTick);
     connect(letterTimer_, &QTimer::timeout, this, &VigenereScene::onLetterTick);
     connect(pulseTimer_, &QTimer::timeout, this, &VigenereScene::animatePulse);
 }
@@ -113,14 +115,50 @@ void VigenereScene::showExplanation(const QString& text) {
 }
 
 void VigenereScene::startAnimation(const QString& text, const QString& keyword) {
-    reset();
-    inputText_ = text.toUpper();
-    keyword_ = keyword.toUpper().remove(QRegularExpression("[^A-Z]"));
-    if (keyword_.isEmpty()) return;
+    QString newText = text.toUpper();
+    QString newKeyword = keyword.toUpper().remove(QRegularExpression("[^A-Z]"));
+    if (newKeyword.isEmpty()) return;
 
+    // 如果 rewind 正在进行，只更新 pending 参数，不打断当前 rewind
+    if (rewindTimer_->isActive()) {
+        qInfo() << "[Vigenere] Rewind in progress, queuing new animation";
+        pendingText_ = newText;
+        pendingKeyword_ = newKeyword;
+        return;
+    }
+
+    // 先废除所有旧动画的 singleShot 回调
+    animationId_++;
+    activeAnimId_ = animationId_;
+    rotateStepTimer_->stop();
+    rotateStepAnimTimer_->stop();
+    rewindTimer_->stop();
+    pulseTimer_->stop();
+
+    inputText_ = newText;
+    keyword_ = newKeyword;
+
+    // 如果内圈还在非零位置，先回转再启动新动画
+    if (qAbs(currentRotation_) > 0.1 && innerRing_) {
+        qInfo() << "[Vigenere] Inner ring at" << currentRotation_ << "deg, rewinding first";
+        showExplanation("正在复位内圈...");
+        pendingText_ = inputText_;
+        pendingKeyword_ = keyword_;
+        rewindFromDeg_ = currentRotation_;
+        rewindFrame_ = 0;
+        rewindTimer_->start(20);
+        return;
+    }
+
+    reset();
+    launchAnimation();
+}
+
+void VigenereScene::launchAnimation() {
     // 计算每个字母的 shift
     QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     int ki = 0;
+    keywordIndex_ = 0;
     for (int i = 0; i < inputText_.size(); i++) {
         if (inputText_[i].isLetter()) {
             shifts_.append(alpha.indexOf(keyword_[ki % keyword_.size()]));
@@ -134,7 +172,6 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
 
     drawRings();
 
-    // 标签
     auto* outerLabel = addText("明文", QFont("PingFang SC", 10));
     outerLabel->setDefaultTextColor(QColor(0, 200, 255, 180));
     outerLabel->setPos(CX + R_OUTER + 5, CY - 10);
@@ -145,7 +182,6 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
     innerLabel->setPos(CX + R_INNER + 5, CY - 10);
     innerLabel->setZValue(2);
 
-    // 密钥显示
     keywordDisplay_ = addText("密钥: " + keyword_, QFont("Menlo", 12, QFont::Bold));
     keywordDisplay_->setDefaultTextColor(QColor(255, 200, 0));
     keywordDisplay_->setGraphicsEffect(glow(QColor(255, 200, 0), 10));
@@ -166,11 +202,8 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
     currentRotation_ = 0;
     currentLetterIndex_ = 0;
 
-    // 显示初始说明
     showExplanation("维吉尼亚密码: 使用密钥对每个字母施加不同偏移量");
 
-    // 2 秒延迟后开始处理第一个字母（让用户有时间读说明）
-    animationId_++;
     int myId = animationId_;
     QTimer::singleShot(2000, this, [this, myId]() {
         if (myId != animationId_) return;
@@ -180,6 +213,7 @@ void VigenereScene::startAnimation(const QString& text, const QString& keyword) 
 }
 
 void VigenereScene::onLetterTick() {
+    if (animationId_ != activeAnimId_) return;
     if (currentLetterIndex_ >= inputText_.size()) {
         letterTimer_->stop();
         // 所有字母处理完毕
@@ -220,9 +254,9 @@ void VigenereScene::onLetterTick() {
     }
 
     // 字母处理：显示说明 → 逐格旋转 → 高亮 → 下一个
-    QChar keyCh = keyword_[currentLetterIndex_ % keyword_.size()];
-    QString alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    int keyIdx = alpha.indexOf(keyCh);
+    int keyIdx = shifts_[currentLetterIndex_];
+    QChar keyCh = keyword_[keywordIndex_ % keyword_.size()];
+    keywordIndex_++;
     QChar encrypted = QChar('A' + (ch.unicode() - 'A' + keyIdx) % 26);
 
     QString expl = QString("第 %1 个字母: 明文 %2 + 密钥 %3 (偏移 %4) → %5")
@@ -242,7 +276,14 @@ void VigenereScene::onLetterTick() {
 
 void VigenereScene::startLetterRotation(int targetShift) {
     rotateStepIndex_ = 0;
-    rotateStepTotal_ = targetShift;
+    // 偏移 >= 14 时反向旋转更快（如 14→顺时针12步, 22→顺时针4步）
+    if (targetShift > 13) {
+        rotateStepTotal_ = 26 - targetShift;
+        rotateDirection_ = -1;
+    } else {
+        rotateStepTotal_ = targetShift;
+        rotateDirection_ = 1;
+    }
 
     if (rotateStepTotal_ == 0) {
         // 偏移为 0，直接高亮
@@ -258,15 +299,22 @@ void VigenereScene::startLetterRotation(int targetShift) {
 
         currentLetterIndex_++;
         highlightShowing_ = true;
-        // 高亮停留后，再等 500ms 给用户反应时间
+        // 高亮停留后，回转内圈到初始位置，再处理下一个字母
         QTimer::singleShot(animSpeed_ + 500, this, [this, myId = animationId_]() {
             if (myId != animationId_) return;
             clearHighlights();
             highlightShowing_ = false;
-            QTimer::singleShot(500, this, [this, myId = animationId_]() {
-                if (myId != animationId_) return;
-                onLetterTick();
-            });
+            if (currentLetterIndex_ < inputText_.size() && qAbs(currentRotation_) > 0.1) {
+                showExplanation("回转内圈到初始位置...");
+                rewindFromDeg_ = currentRotation_;
+                rewindFrame_ = 0;
+                rewindTimer_->start(20);
+            } else {
+                QTimer::singleShot(500, this, [this, myId = animationId_]() {
+                    if (myId != animationId_) return;
+                    onLetterTick();
+                });
+            }
         });
         return;
     }
@@ -288,7 +336,7 @@ void VigenereScene::onRotateStepTick() {
         rotateStepTimer_->stop();
         // 旋转完成，高亮配对
         int outerIdx = inputText_[currentLetterIndex_].unicode() - 'A';
-        int innerIdx = (outerIdx + rotateStepTotal_) % 26;
+        int innerIdx = (outerIdx + rotateDirection_ * rotateStepTotal_ + 26) % 26;
         highlightPair(outerIdx, innerIdx);
 
         QChar encrypted = QChar('A' + innerIdx);
@@ -300,21 +348,28 @@ void VigenereScene::onRotateStepTick() {
         currentLetterIndex_++;
         highlightShowing_ = true;
 
-        // 高亮停留后，再等 500ms 给用户反应时间
+        // 高亮停留后，回转内圈到初始位置，再处理下一个字母
         QTimer::singleShot(animSpeed_ + 500, this, [this, myId = animationId_]() {
             if (myId != animationId_) return;
             clearHighlights();
             highlightShowing_ = false;
-            QTimer::singleShot(500, this, [this, myId = animationId_]() {
-                if (myId != animationId_) return;
-                onLetterTick();
-            });
+            if (currentLetterIndex_ < inputText_.size() && qAbs(currentRotation_) > 0.1) {
+                showExplanation("回转内圈到初始位置...");
+                rewindFromDeg_ = currentRotation_;
+                rewindFrame_ = 0;
+                rewindTimer_->start(20);
+            } else {
+                QTimer::singleShot(500, this, [this, myId = animationId_]() {
+                    if (myId != animationId_) return;
+                    onLetterTick();
+                });
+            }
         });
         return;
     }
 
     stepFromDeg_ = currentRotation_;
-    stepToDeg_ = -(rotateStepIndex_ + 1) * DEG;
+    stepToDeg_ = rotateDirection_ * -(rotateStepIndex_ + 1) * DEG;
     stepAnimFrame_ = 0;
     rotateStepIndex_++;
     rotateStepAnimTimer_->start(20);
@@ -331,6 +386,44 @@ void VigenereScene::onRotateStepAnimTick() {
         rotateStepAnimTimer_->stop();
     }
     setInnerRingRotation(currentRotation_);
+}
+
+void VigenereScene::onRewindTick() {
+    rewindFrame_++;
+    double t = static_cast<double>(rewindFrame_) / REWIND_FRAMES;
+    if (t >= 1.0) t = 1.0;
+
+    currentRotation_ = rewindFromDeg_ * (1.0 - t);
+    setInnerRingRotation(currentRotation_);
+
+    if (rewindFrame_ >= REWIND_FRAMES) {
+        rewindTimer_->stop();
+        currentRotation_ = 0;
+        setInnerRingRotation(0);
+
+        if (!pendingText_.isEmpty()) {
+            // 用户触发的 rewind：有待处理的新动画参数
+            qInfo() << "[Vigenere] User rewind complete, restoring pending:" << pendingText_;
+            inputText_ = pendingText_;
+            keyword_ = pendingKeyword_;
+            pendingText_.clear();
+            pendingKeyword_.clear();
+
+            QTimer::singleShot(300, this, [this, myId = animationId_]() {
+                if (myId != animationId_) return;
+                reset();
+                launchAnimation();
+            });
+        } else {
+            // 动画内部的字母间 rewind：继续处理下一个字母
+            qInfo() << "[Vigenere] Letter rewind complete, continuing to next letter";
+            showExplanation("回转完成, 处理下一个字母");
+            QTimer::singleShot(500, this, [this, myId = animationId_]() {
+                if (myId != animationId_) return;
+                onLetterTick();
+            });
+        }
+    }
 }
 
 void VigenereScene::highlightPair(int outerIdx, int innerIdx) {
@@ -366,6 +459,7 @@ void VigenereScene::animatePulse() {
 void VigenereScene::reset() {
     rotateStepTimer_->stop();
     rotateStepAnimTimer_->stop();
+    rewindTimer_->stop();
     letterTimer_->stop();
     pulseTimer_->stop();
     clear();
@@ -378,11 +472,12 @@ void VigenereScene::reset() {
     explanation_ = nullptr;
     currentRotation_ = 0;
     rotateStepIndex_ = 0;
+    rotateDirection_ = 1;
     currentLetterIndex_ = 0;
+    keywordIndex_ = 0;
     highlightShowing_ = false;
     resultString_.clear();
     shifts_.clear();
-    animationId_++;
 }
 
 void VigenereScene::setSpeed(int ms) {

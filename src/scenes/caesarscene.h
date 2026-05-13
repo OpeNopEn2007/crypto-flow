@@ -21,6 +21,7 @@ signals:
 private slots:
     void onStepTick();
     void onStepAnimTick();
+    void onRewindTick();
     void animateHighlight();
     void animatePulse();
     void animateConnectionLine();
@@ -29,6 +30,7 @@ private:
     void drawOuterRing();
     void drawInnerRing();
     void setInnerRingRotation(double deg);
+    void launchAnimation();
     void highlightPair(int outerIdx, int innerIdx);
     void clearHighlights();
     void startConnectionLineAnimation(int outerIdx, int innerIdx);
@@ -45,6 +47,7 @@ private:
 
     QTimer* stepTimer_ = nullptr;      // 控制每格跳动的间隔
     QTimer* stepAnimTimer_ = nullptr;  // 控制每格内部的过渡动画
+    QTimer* rewindTimer_ = nullptr;    // 回转动画计时器
     QTimer* highlightTimer_ = nullptr;
     QTimer* pulseTimer_ = nullptr;
     QTimer* connectionAnimTimer_ = nullptr;
@@ -53,10 +56,15 @@ private:
     int shift_ = 0;
     int animSpeed_ = 1000;
 
+    // 待处理参数（rewind 期间缓存）
+    QString pendingText_;
+    int pendingShift_ = 0;
+
     // 逐格旋转
     double currentRotation_ = 0; // 当前总旋转角度
     int rotateStepIndex_ = 0;   // 当前第几格
     int rotateStepTotal_ = 0;   // 总共几格
+    int rotateDirection_ = 1;   // 1=逆时针(+), -1=顺时针(-)
     double stepFromDeg_ = 0;    // 当前格起始角度
     double stepToDeg_ = 0;      // 当前格目标角度
     int stepAnimFrame_ = 0;     // 当前格内动画帧
@@ -79,6 +87,11 @@ private:
     double pulsePhase_ = 0;
     double outerGlowBase_ = 20;
     double innerGlowBase_ = 15;
+
+    // 回转动画
+    double rewindFromDeg_ = 0;
+    int rewindFrame_ = 0;
+    static const int REWIND_FRAMES = 30; // 回转帧数（匀速）
 
     // 结果打字机效果
     int resultCharIndex_ = 0;

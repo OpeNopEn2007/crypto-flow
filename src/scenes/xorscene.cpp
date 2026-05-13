@@ -2,365 +2,181 @@
 #include <QPen>
 #include <QBrush>
 #include <QFont>
-#include <QFontMetrics>
 #include <QDebug>
 #include <QGraphicsDropShadowEffect>
-#include <QtMath>
 
-static const double SW = 600;
-static const double SH = 500;
-static const double PLAIN_Y = 160;  // 明文轨道
-static const double KEY_Y = 280;    // 密钥轨道
-static const double MERGE_X = 300;  // XOR 运算位置
-static const double RESULT_Y = 220; // 结果轨道
+static const double SCENE_W = 600;
+static const double CARD_W = 520;
+static const double CARD_H = 80;
+static const double CARD_X = (SCENE_W - CARD_W) / 2;
+static const double CARD_SPACING = 95;
+static const double START_Y = 65;
 
-static QGraphicsDropShadowEffect* glow(QColor c, int b = 15) {
-    auto* e = new QGraphicsDropShadowEffect;
-    e->setBlurRadius(b);
-    e->setColor(c);
-    e->setOffset(0);
-    return e;
+static QGraphicsDropShadowEffect* createGlowEffect(QColor color, int blur = 15) {
+    auto* effect = new QGraphicsDropShadowEffect;
+    effect->setBlurRadius(blur);
+    effect->setColor(color);
+    effect->setOffset(0);
+    return effect;
 }
 
 XORScene::XORScene(QObject* parent)
-    : QGraphicsScene(parent)
-    , animTimer_(new QTimer(this))
-    , phaseTimer_(new QTimer(this)) {
-    setSceneRect(0, 0, SW, SH);
-    connect(animTimer_, &QTimer::timeout, this, &XORScene::onAnimFrame);
-    connect(phaseTimer_, &QTimer::timeout, this, &XORScene::onPhaseDelay);
+    : QGraphicsScene(parent), timer_(new QTimer(this)) {
+    setSceneRect(0, 0, SCENE_W, 500);
+    connect(timer_, &QTimer::timeout, this, &XORScene::animateStep);
 }
 
-void XORScene::setupPipeline() {
-    title_ = addCenteredText("XOR 加密", QFont("PingFang SC", 20, QFont::Bold),
-                              QColor(255, 100, 200), 15);
-    title_->setGraphicsEffect(glow(QColor(255, 100, 200), 20));
+void XORScene::addStep(const QString& desc, const QString& formula, const QString& value,
+                        QColor accent) {
+    double y = START_Y + steps_.size() * CARD_SPACING;
+    int stepNum = steps_.size() + 1;
 
-    // 上轨道（明文）
-    addLine(30, PLAIN_Y, MERGE_X - 30, PLAIN_Y,
-            QPen(QColor(0, 180, 255, 60), 2));
-    addText("明文", QFont("PingFang SC", 10))->setDefaultTextColor(QColor(0, 180, 255, 150));
-    auto* pt = items().last();
-    pt->setPos(10, PLAIN_Y - 25);
+    auto* shadow = addRect(CARD_X + 2, y + 3, CARD_W, CARD_H,
+                           QPen(Qt::NoPen), QBrush(QColor(0, 0, 0, 60)));
+    shadow->setZValue(-1);
 
-    // 下轨道（密钥）
-    addLine(30, KEY_Y, MERGE_X - 30, KEY_Y,
-            QPen(QColor(255, 100, 200, 60), 2));
-    auto* kt = addText("密钥", QFont("PingFang SC", 10));
-    kt->setDefaultTextColor(QColor(255, 100, 200, 150));
-    kt->setPos(10, KEY_Y + 10);
+    QColor bgDark = QColor(accent.red() * 0.15, accent.green() * 0.15, accent.blue() * 0.15, 240);
+    auto* bg = addRect(CARD_X, y, CARD_W, CARD_H,
+                       QPen(QColor(accent.red(), accent.green(), accent.blue(), 60), 1),
+                       QBrush(bgDark));
+    bg->setZValue(0);
 
-    // XOR 运算器（菱形）
-    QPolygonF diamond({
-        QPointF(MERGE_X, PLAIN_Y + 15),
-        QPointF(MERGE_X + 50, RESULT_Y),
-        QPointF(MERGE_X, KEY_Y - 15),
-        QPointF(MERGE_X - 50, RESULT_Y)
-    });
-    auto* xorBg = addPolygon(diamond,
-                              QPen(QColor(255, 200, 80), 2),
-                              QBrush(QColor(30, 25, 15, 220)));
-    xorBg->setZValue(-1);
-    auto* xorLabel = addText("XOR", QFont("Menlo", 14, QFont::Bold));
-    xorLabel->setDefaultTextColor(QColor(255, 200, 80));
-    QRectF xlr = xorLabel->boundingRect();
-    xorLabel->setPos(MERGE_X - xlr.width() / 2, RESULT_Y - xlr.height() / 2);
-    xorLabel->setZValue(1);
+    auto* bar = addRect(CARD_X, y, 5, CARD_H,
+                        QPen(Qt::NoPen), QBrush(accent));
+    bar->setZValue(1);
+    bar->setGraphicsEffect(createGlowEffect(accent, 10));
 
-    // 输出管道
-    addLine(MERGE_X + 50, RESULT_Y, 570, RESULT_Y,
-            QPen(QColor(0, 255, 150, 60), 2));
-    auto* ot = addText("密文", QFont("PingFang SC", 10));
-    ot->setDefaultTextColor(QColor(0, 255, 150, 150));
-    ot->setPos(560, RESULT_Y - 25);
+    double numX = CARD_X + 20;
+    double numY = y + CARD_H / 2 - 12;
+    auto* numBg = addEllipse(numX - 2, numY - 2, 30, 30,
+                              QPen(accent, 1.5), QBrush(QColor(0, 0, 0, 150)));
+    numBg->setZValue(1);
+    auto* numItem = addText(QString("%1").arg(stepNum), QFont("Menlo", 14, QFont::Bold));
+    numItem->setPos(numX + 4, numY);
+    numItem->setDefaultTextColor(accent);
+    numItem->setZValue(2);
 
-    // 汇入箭头
-    addFlowArrow(MERGE_X - 30, PLAIN_Y, MERGE_X - 50, RESULT_Y, QColor(0, 180, 255, 150));
-    addFlowArrow(MERGE_X - 30, KEY_Y, MERGE_X - 50, RESULT_Y, QColor(255, 100, 200, 150));
-    addFlowArrow(MERGE_X + 50, RESULT_Y, MERGE_X + 70, RESULT_Y, QColor(0, 255, 150, 150));
-}
+    auto* label = addText(desc, QFont("PingFang SC", 16));
+    label->setPos(CARD_X + 60, y + 8);
+    label->setDefaultTextColor(QColor(220, 220, 230));
+    label->setZValue(1);
 
-void XORScene::addDataBlock(double x, double y, const QString& text, QColor color,
-                              const QString& label) {
-    QFont font("Menlo", 13, QFont::Bold);
-    QFontMetrics fm(font);
-    double tw = fm.horizontalAdvance(text) + 20;
-    double th = 32;
+    auto* formulaItem = addText(formula, QFont("Menlo", 13));
+    formulaItem->setPos(CARD_X + 60, y + 38);
+    formulaItem->setDefaultTextColor(QColor(80, 200, 255));
+    formulaItem->setZValue(1);
 
-    DataBlock block;
-    block.bg = addRect(x, y, tw, th,
-                        QPen(color, 2), QBrush(QColor(15, 25, 40, 220)));
-    block.bg->setZValue(3);
-
-    block.text = addText(text, font);
-    block.text->setDefaultTextColor(color);
-    block.text->setPos(x + 10, y + 5);
-    block.text->setZValue(4);
-
-    if (!label.isEmpty()) {
-        block.label = addText(label, QFont("PingFang SC", 9));
-        block.label->setDefaultTextColor(QColor(150, 150, 160));
-        block.label->setPos(x + 10, y + th + 3);
-        block.label->setZValue(4);
+    QGraphicsTextItem* valueItem = nullptr;
+    if (!value.isEmpty()) {
+        int vFontSize = value.size() > 20 ? 13 : 20;
+        QFont vFont("Menlo", vFontSize, QFont::Bold);
+        valueItem = addText(value, vFont);
+        double valW = valueItem->boundingRect().width();
+        valueItem->setPos(CARD_X + CARD_W - valW - 25, y + 22);
+        valueItem->setDefaultTextColor(QColor(0, 255, 140));
+        valueItem->setGraphicsEffect(createGlowEffect(QColor(0, 255, 140), 15));
+        valueItem->setZValue(1);
     }
 
-    block.targetX = x;
-    block.targetY = y;
-    block.color = color;
-    dataBlocks_.append(block);
-}
-
-void XORScene::clearDataBlocks() {
-    for (auto& b : dataBlocks_) {
-        if (b.bg) { removeItem(b.bg); delete b.bg; }
-        if (b.text) { removeItem(b.text); delete b.text; }
-        if (b.label) { removeItem(b.label); delete b.label; }
+    if (steps_.size() > 0) {
+        double prevY = START_Y + (steps_.size() - 1) * CARD_SPACING + CARD_H;
+        double midX = SCENE_W / 2;
+        auto* arrowLine = addLine(midX, prevY + 2, midX, y - 2,
+                                   QPen(QColor(accent.red(), accent.green(), accent.blue(), 100), 1.5));
+        arrowLine->setZValue(0);
+        auto* head = addPolygon(QPolygonF({
+            QPointF(midX - 4, y - 4), QPointF(midX + 4, y - 4), QPointF(midX, y + 2)
+        }), QPen(Qt::NoPen), QBrush(QColor(accent.red(), accent.green(), accent.blue(), 180)));
+        head->setZValue(1);
     }
-    dataBlocks_.clear();
-}
 
-void XORScene::addFlowArrow(double x1, double y1, double x2, double y2, QColor color) {
-    addLine(x1, y1, x2, y2, QPen(color, 2));
-    double angle = atan2(y2 - y1, x2 - x1);
-    double len = 8;
-    QPointF p1(x2, y2);
-    QPointF p2(x2 - len * cos(angle - 0.4), y2 - len * sin(angle - 0.4));
-    QPointF p3(x2 - len * cos(angle + 0.4), y2 - len * sin(angle + 0.4));
-    addPolygon(QPolygonF({p1, p2, p3}), QPen(Qt::NoPen), QBrush(color));
-}
-
-QGraphicsTextItem* XORScene::addCenteredText(const QString& text, const QFont& font,
-                                               QColor color, double y) {
-    auto* t = addText(text, font);
-    t->setDefaultTextColor(color);
-    QRectF r = t->boundingRect();
-    t->setPos((SW - r.width()) / 2, y);
-    t->setZValue(5);
-    return t;
-}
-
-void XORScene::addExplanation(const QString& text) {
-    if (explanation_) {
-        removeItem(explanation_);
-        delete explanation_;
-    }
-    explanation_ = addCenteredText(text, QFont("PingFang SC", 11),
-                                    QColor(180, 180, 190), SH - 60);
+    steps_.append({label, formulaItem, valueItem, bg, nullptr});
 }
 
 void XORScene::startAnimation(const QString& text, const QString& key) {
     reset();
-    inputText_ = text;
-    keyText_ = key;
-    inputBytes_ = text.toUtf8();
-    keyBytes_ = key.toUtf8();
 
-    resultBytes_.resize(inputBytes_.size());
-    for (int i = 0; i < inputBytes_.size(); i++) {
-        resultBytes_[i] = inputBytes_[i] ^ keyBytes_[i % keyBytes_.size()];
+    auto* title = addText("XOR 加密", QFont("PingFang SC", 26, QFont::Bold));
+    title->setDefaultTextColor(QColor(255, 100, 200));
+    title->setGraphicsEffect(createGlowEffect(QColor(255, 100, 200), 20));
+    QRectF titleRect = title->boundingRect();
+    title->setPos((SCENE_W - titleRect.width()) / 2, 10);
+
+    auto* underline = addLine((SCENE_W - titleRect.width()) / 2, 48,
+                               (SCENE_W + titleRect.width()) / 2, 48,
+                               QPen(QColor(255, 100, 200, 80), 1));
+    underline->setZValue(0);
+
+    QByteArray inputBytes = text.toUtf8();
+    QByteArray keyBytes = key.toUtf8();
+
+    // Step 1: 明文
+    pendingSteps_.append({"明文", {"", text}});
+    pendingAccents_.append(QColor(0, 180, 255));
+
+    // Step 2: 密钥
+    pendingSteps_.append({"密钥 (循环使用)", {"", key}});
+    pendingAccents_.append(QColor(255, 100, 200));
+
+    // Step 3: 逐字节 XOR
+    QString xorDetail;
+    QByteArray result;
+    result.resize(inputBytes.size());
+    for (int i = 0; i < inputBytes.size(); i++) {
+        uchar p = (uchar)inputBytes[i];
+        uchar k = (uchar)keyBytes[i % keyBytes.size()];
+        uchar r = p ^ k;
+        result[i] = r;
+        if (i > 0) xorDetail += "  ";
+        xorDetail += QString("%1^%2=%3")
+            .arg(QString("%1").arg(p, 2, 16, QChar('0')).toUpper())
+            .arg(QString("%1").arg(k, 2, 16, QChar('0')).toUpper())
+            .arg(QString("%1").arg(r, 2, 16, QChar('0')).toUpper());
     }
+    pendingSteps_.append({"逐字节 XOR",
+                           {xorDetail, ""}});
+    pendingAccents_.append(QColor(255, 200, 80));
 
-    qInfo() << "[XOR] Start:" << text << "key:" << key;
+    // Step 4: 十六进制结果
+    QString hexResult;
+    for (int i = 0; i < result.size(); i++) {
+        if (i > 0) hexResult += " ";
+        hexResult += QString("%1").arg((uchar)result[i], 2, 16, QChar('0')).toUpper();
+    }
+    pendingSteps_.append({"加密结果",
+                           {text + " ⊕ " + key, hexResult}});
+    pendingAccents_.append(QColor(0, 255, 140));
 
-    setupPipeline();
-
-    animationId_++;
-    int myId = animationId_;
-    currentPhase_ = 0;
-
-    QTimer::singleShot(1500, this, [this, myId]() {
-        if (myId != animationId_) return;
-        onPhaseDelay();
-    });
+    qInfo() << "[XOR]" << text << "^" << key;
+    timer_->start(animSpeed_);
 }
 
-void XORScene::onPhaseDelay() {
-    clearDataBlocks();
-    int myId = animationId_;
-
-    if (currentPhase_ == 0) {
-        // Phase 1: 明文和密钥进入
-        addExplanation("明文和密钥分别进入 XOR 运算器");
-
-        // 明文从左边滑入（上轨道）
-        addDataBlock(-200, PLAIN_Y - 16, "\"" + inputText_ + "\"",
-                     QColor(0, 230, 255), "明文");
-        for (auto& b : dataBlocks_) {
-            b.targetX = 60;
-        }
-
-        animFrame_ = 0;
-        animTimer_->start(30);
-
-        QTimer::singleShot(animSpeed_, this, [this, myId]() {
-            if (myId != animationId_) return;
-            clearDataBlocks();
-
-            // 明文停在上轨道
-            addDataBlock(60, PLAIN_Y - 16, "\"" + inputText_ + "\"",
-                         QColor(0, 230, 255), "明文");
-
-            // 密钥从左边滑入（下轨道）
-            addDataBlock(-200, KEY_Y - 16, "\"" + keyText_ + "\"",
-                         QColor(255, 150, 220), "密钥");
-            for (auto& b : dataBlocks_) {
-                if (b.targetY == KEY_Y - 16) b.targetX = 60;
-            }
-
-            animFrame_ = 0;
-            animTimer_->start(30);
-
-            currentPhase_++;
-            phaseTimer_->start(animSpeed_);
-        });
-
-    } else if (currentPhase_ == 1) {
-        // Phase 2: 二进制对比
-        addExplanation("将明文和密钥转为二进制，逐位对比");
-
-        // 明文二进制（上轨道）
-        double px = 40;
-        for (int i = 0; i < qMin(inputBytes_.size(), (qsizetype)5); i++) {
-            uchar p = (uchar)inputBytes_[i];
-            addDataBlock(px, PLAIN_Y - 20, QString("%1").arg(p, 8, 2, QChar('0')),
-                         QColor(0, 200, 255), QString("B%1").arg(i + 1));
-            px += 95;
-        }
-
-        // 密钥二进制（下轨道）
-        double kx = 40;
-        for (int i = 0; i < qMin(inputBytes_.size(), (qsizetype)5); i++) {
-            uchar k = (uchar)keyBytes_[i % keyBytes_.size()];
-            addDataBlock(kx, KEY_Y - 12, QString("%1").arg(k, 8, 2, QChar('0')),
-                         QColor(255, 150, 220));
-            kx += 95;
-        }
-
-        if (inputBytes_.size() > 5) {
-            addDataBlock(px, PLAIN_Y - 20, "...", QColor(120, 120, 130));
-        }
-
-        currentPhase_++;
-        phaseTimer_->start(animSpeed_);
-
-    } else if (currentPhase_ == 2) {
-        // Phase 3: XOR 运算 — 逐位碰撞
-        addExplanation("XOR 规则: 相同→0, 不同→1");
-
-        // 明文位（上轨道向 XOR 靠拢）
-        double px = 50;
-        for (int i = 0; i < qMin(inputBytes_.size(), (qsizetype)4); i++) {
-            uchar p = (uchar)inputBytes_[i];
-            uchar k = (uchar)keyBytes_[i % keyBytes_.size()];
-            uchar r = p ^ k;
-
-            double rowY = 100 + i * 80;
-
-            // 明文
-            addDataBlock(px, rowY, QString("%1").arg(p, 8, 2, QChar('0')),
-                         QColor(0, 200, 255));
-
-            // XOR 符号
-            auto* xorSign = addText("XOR", QFont("Menlo", 11, QFont::Bold));
-            xorSign->setDefaultTextColor(QColor(255, 200, 80));
-            xorSign->setPos(160, rowY + 5);
-            xorSign->setZValue(5);
-
-            // 密钥
-            addDataBlock(210, rowY, QString("%1").arg(k, 8, 2, QChar('0')),
-                         QColor(255, 150, 220));
-
-            // 等号
-            addFlowArrow(320, rowY + 16, 350, rowY + 16, QColor(0, 230, 120));
-
-            // 结果
-            addDataBlock(355, rowY, QString("%1").arg(r, 8, 2, QChar('0')),
-                         QColor(0, 255, 140));
-        }
-
-        if (inputBytes_.size() > 4) {
-            auto* dots = addCenteredText("... 共 " + QString::number(inputBytes_.size()) + " 字节",
-                                          QFont("PingFang SC", 10), QColor(120, 120, 130),
-                                          100 + 4 * 80);
-        }
-
-        currentPhase_++;
-        phaseTimer_->start(animSpeed_);
-
-    } else if (currentPhase_ == 3) {
-        // Phase 4: 结果输出
-        addExplanation("XOR 结果即为密文，再次 XOR 同一密钥可解密");
-
-        // 密文从 XOR 运算器滑出
-        QString hexResult;
-        for (int i = 0; i < resultBytes_.size(); i++) {
-            if (i > 0) hexResult += " ";
-            hexResult += QString("%1").arg((uchar)resultBytes_[i], 2, 16, QChar('0')).toUpper();
-        }
-
-        addDataBlock(MERGE_X + 60, RESULT_Y - 16, hexResult,
-                     QColor(0, 255, 140), "密文 (Hex)");
-
-        for (auto& b : dataBlocks_) {
-            b.targetX = 570 - b.text->boundingRect().width() - 20;
-        }
-        animFrame_ = 0;
-        animTimer_->start(30);
-
-        QTimer::singleShot(animSpeed_, this, [this, myId]() {
-            if (myId != animationId_) return;
-
-            QString hexResult;
-            for (int i = 0; i < resultBytes_.size(); i++) {
-                if (i > 0) hexResult += " ";
-                hexResult += QString("%1").arg((uchar)resultBytes_[i], 2, 16, QChar('0')).toUpper();
-            }
-
-            addExplanation(QString("完成: \"%1\" XOR \"%2\" → %3")
-                               .arg(inputText_).arg(keyText_).arg(hexResult));
-
-            qInfo() << "[XOR] Complete";
-            currentPhase_++;
-            phaseTimer_->start(1500);
-        });
-    } else {
-        phaseTimer_->stop();
+void XORScene::animateStep() {
+    if (currentStep_ >= pendingSteps_.size()) {
+        timer_->stop();
+        qInfo() << "[XOR] Animation complete";
         emit animationComplete();
-    }
-}
-
-void XORScene::onAnimFrame() {
-    animFrame_++;
-    for (auto& b : dataBlocks_) {
-        double curX = b.text->x() + (b.targetX - b.text->x()) * 0.15;
-        b.text->setPos(curX, b.text->y());
-        if (b.bg) b.bg->setPos(curX - 10, b.bg->y());
-        if (b.label) b.label->setPos(curX + 10, b.label->y());
+        return;
     }
 
-    if (animFrame_ >= ANIM_FRAMES) {
-        animTimer_->stop();
-        for (auto& b : dataBlocks_) {
-            b.text->setPos(b.targetX, b.text->y());
-            if (b.bg) b.bg->setPos(b.targetX - 10, b.bg->y());
-            if (b.label) b.label->setPos(b.targetX + 10, b.label->y());
-        }
-    }
+    auto& step = pendingSteps_[currentStep_];
+    QColor accent = (currentStep_ < pendingAccents_.size())
+                    ? pendingAccents_[currentStep_]
+                    : QColor(0, 180, 255);
+    addStep(step.first, step.second.first, step.second.second, accent);
+    currentStep_++;
 }
 
 void XORScene::reset() {
-    animTimer_->stop();
-    phaseTimer_->stop();
+    timer_->stop();
     clear();
-    dataBlocks_.clear();
-    explanation_ = nullptr;
-    title_ = nullptr;
-    currentPhase_ = 0;
-    resultBytes_.clear();
-    animationId_++;
+    steps_.clear();
+    pendingSteps_.clear();
+    pendingAccents_.clear();
+    currentStep_ = 0;
 }
 
 void XORScene::setSpeed(int ms) {
     animSpeed_ = ms;
-    if (phaseTimer_->isActive()) phaseTimer_->setInterval(ms);
+    if (timer_->isActive()) timer_->setInterval(ms);
 }

@@ -115,7 +115,7 @@ void MainWindow::setupUI() {
     auto* subtitle = welcomeScene->addText("交互式密码学原理可视化", QFont("PingFang SC", 16));
     subtitle->setDefaultTextColor(QColor(150, 150, 150));
     subtitle->setPos(170, 220);
-    auto* hint = welcomeScene->addText("← 选择算法，点击开始演示", QFont("PingFang SC", 13));
+    auto* hint = welcomeScene->addText("→ 选择算法，点击开始演示", QFont("PingFang SC", 13));
     hint->setDefaultTextColor(QColor(100, 100, 100));
     hint->setPos(180, 280);
     view_->setScene(welcomeScene);
@@ -137,14 +137,16 @@ void MainWindow::onRSAKeyGen(int64_t p, int64_t q) {
     view_->setScene(rsaScene_);
     rsaScene_->startKeyGen(p, q);
     auto keys = RSAEngine::generateKeys(p, q);
-    controlPanel_->setRSAValues(keys.n, keys.d);
+    controlPanel_->setRSAValues(keys.e, keys.n, keys.d);
     statusBar()->showMessage(QString("RSA 密钥生成: p=%1, q=%2").arg(p).arg(q));
 }
 
 void MainWindow::onRSAEncrypt(int64_t message, int64_t e, int64_t n) {
     view_->setScene(rsaScene_);
     rsaScene_->startEncrypt(message, e, n);
-    statusBar()->showMessage(QString("RSA 加密: M=%1").arg(message));
+    int64_t cipher = RSAEngine::encrypt(message, e, n);
+    controlPanel_->setLastCipher(cipher);
+    statusBar()->showMessage(QString("RSA 加密: M=%1 → C=%2").arg(message).arg(cipher));
 }
 
 void MainWindow::onRSADecrypt(int64_t cipher, int64_t d, int64_t n) {
@@ -192,9 +194,21 @@ void MainWindow::saveScreenshot(const QString& prefix) {
 }
 
 void MainWindow::autoStartCaesar(const QString& text, int shift) {
+    controlPanel_->setAlgorithm(0);
     onCaesarStart(text, shift);
 }
 
 void MainWindow::autoStartRSA() {
+    controlPanel_->setAlgorithm(1);
     onRSAKeyGen(61, 53);
+}
+
+void MainWindow::autoStartBase64(const QString& text) {
+    controlPanel_->setAlgorithm(3);
+    onBase64Start(text);
+}
+
+void MainWindow::autoStartXOR(const QString& text, const QString& key) {
+    controlPanel_->setAlgorithm(4);
+    onXORStart(text, key);
 }

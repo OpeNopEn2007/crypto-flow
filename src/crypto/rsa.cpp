@@ -14,21 +14,23 @@ bool RSAEngine::isPrime(int64_t n) {
     if (n < 2) return false;
     if (n < 4) return true;
     if (n % 2 == 0 || n % 3 == 0) return false;
-    for (int64_t i = 5; i * i <= n; i += 6) {
+    for (int64_t i = 5; i <= n / i; i += 6) {
         if (n % i == 0 || n % (i + 2) == 0) return false;
     }
     return true;
 }
 
 int64_t RSAEngine::modPow(int64_t base, int64_t exp, int64_t mod) {
-    int64_t result = 1;
-    base %= mod;
+    if (mod <= 0) return 0;
+    __int128 result = 1;
+    __int128 b = base % mod;
+    __int128 m = mod;
     while (exp > 0) {
-        if (exp & 1) result = (result * base) % mod;
+        if (exp & 1) result = (result * b) % m;
         exp >>= 1;
-        base = (base * base) % mod;
+        b = (b * b) % m;
     }
-    return result;
+    return static_cast<int64_t>(result);
 }
 
 int64_t RSAEngine::modInverse(int64_t a, int64_t m) {
@@ -49,11 +51,12 @@ int64_t RSAEngine::modInverse(int64_t a, int64_t m) {
 }
 
 RSAKeys RSAEngine::generateKeys(int64_t p, int64_t q) {
-    RSAKeys keys;
+    RSAKeys keys{};
     keys.p = p;
     keys.q = q;
     keys.n = p * q;
     keys.phi = (p - 1) * (q - 1);
+    if (keys.phi <= 0) return keys;
     keys.e = 65537;
     while (gcd(keys.e, keys.phi) != 1) keys.e += 2;
     keys.d = modInverse(keys.e, keys.phi);

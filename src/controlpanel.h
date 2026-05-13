@@ -12,7 +12,9 @@ class ControlPanel : public QWidget {
     Q_OBJECT
 public:
     explicit ControlPanel(QWidget* parent = nullptr);
-    void setRSAValues(int64_t n, int64_t d);
+    void setRSAValues(int64_t e, int64_t n, int64_t d);
+    void setLastCipher(int64_t cipher);
+    void setAlgorithm(int index);
 
     enum Algorithm { Caesar, RSA, Vigenere, Base64, XOR };
 
@@ -70,4 +72,5 @@ private:
     QPushButton* resetBtn_ = nullptr;
     QSlider* speedSlider_ = nullptr;
     QLabel* speedLabel_ = nullptr;
+    int64_t lastCipher_ = 2557;
 };
