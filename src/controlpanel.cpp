@@ -146,6 +146,9 @@ void ControlPanel::setupRSAPanel() {
         rsaE_->setVisible(idx == 1);
         rsaN_->setVisible(idx > 0);
         rsaD_->setVisible(idx == 2);
+        if (idx == 2) {
+            rsaMessage_->setText(QString::number(lastCipher_));
+        }
     });
     layout->addWidget(rsaMode_);
 
@@ -217,9 +220,18 @@ void ControlPanel::onAlgorithmChanged(int index) {
     emit algorithmChanged(static_cast<Algorithm>(index));
 }
 
-void ControlPanel::setRSAValues(int64_t n, int64_t d) {
+void ControlPanel::setRSAValues(int64_t e, int64_t n, int64_t d) {
+    rsaE_->setText(QString::number(e));
     rsaN_->setText(QString::number(n));
     rsaD_->setText(QString::number(d));
+}
+
+void ControlPanel::setLastCipher(int64_t cipher) {
+    lastCipher_ = cipher;
+}
+
+void ControlPanel::setAlgorithm(int index) {
+    algoCombo_->setCurrentIndex(index);
 }
 
 void ControlPanel::onStartClicked() {
@@ -240,21 +252,65 @@ void ControlPanel::onStartClicked() {
                 QMessageBox::warning(this, "输入错误", "p 和 q 不能相同!");
                 return;
             }
+            if (p < 3 || q < 3) {
+                QMessageBox::warning(this, "输入错误", "p 和 q 必须 >= 3!");
+                return;
+            }
             emit rsaKeyGen(p, q);
         } else if (mode == 1) {
-            emit rsaEncrypt(rsaMessage_->text().toLongLong(),
-                           rsaE_->text().toLongLong(),
-                           rsaN_->text().toLongLong());
+            bool ok = false;
+            int64_t msg = rsaMessage_->text().toLongLong(&ok);
+            if (!ok) { QMessageBox::warning(this, "输入错误", "明文必须是数字"); return; }
+            int64_t n = rsaN_->text().toLongLong(&ok);
+            if (!ok || n <= 0) { QMessageBox::warning(this, "输入错误", "请先生成密钥 (n > 0)"); return; }
+            if (msg < 0 || msg >= n) {
+                QMessageBox::warning(this, "输入错误",
+                    QString("明文 M 必须满足 0 <= M < n!\n当前: M=%1, n=%2").arg(msg).arg(n));
+                return;
+            }
+            int64_t e = rsaE_->text().toLongLong(&ok);
+            if (!ok || e <= 0) { QMessageBox::warning(this, "输入错误", "公钥 e 必须是正整数"); return; }
+            emit rsaEncrypt(msg, e, n);
         } else {
-            emit rsaDecrypt(rsaMessage_->text().toLongLong(),
-                           rsaD_->text().toLongLong(),
-                           rsaN_->text().toLongLong());
+            bool ok = false;
+            int64_t cipher = rsaMessage_->text().toLongLong(&ok);
+            if (!ok) { QMessageBox::warning(this, "输入错误", "密文必须是数字"); return; }
+            int64_t n = rsaN_->text().toLongLong(&ok);
+            if (!ok || n <= 0) { QMessageBox::warning(this, "输入错误", "请先生成密钥 (n > 0)"); return; }
+            int64_t d = rsaD_->text().toLongLong(&ok);
+            if (!ok || d <= 0) { QMessageBox::warning(this, "输入错误", "私钥 d 必须是正整数"); return; }
+            if (cipher < 0 || cipher >= n) {
+                QMessageBox::warning(this, "输入错误",
+                    QString("密文 C 必须满足 0 <= C < n!\n当前: C=%1, n=%2").arg(cipher).arg(n));
+                return;
+            }
+            emit rsaDecrypt(cipher, d, n);
         }
     } else if (idx == Vigenere) {
+        if (vigenereKey_->text().isEmpty()) {
+            QMessageBox::warning(this, "输入错误", "密钥不能为空!");
+            return;
+        }
+        if (vigenereInput_->text().isEmpty()) {
+            QMessageBox::warning(this, "输入错误", "输入文本不能为空!");
+            return;
+        }
         emit vigenereStart(vigenereInput_->text(), vigenereKey_->text());
     } else if (idx == Base64) {
+        if (base64Input_->text().isEmpty()) {
+            QMessageBox::warning(this, "输入错误", "输入文本不能为空!");
+            return;
+        }
         emit base64Start(base64Input_->text());
     } else if (idx == XOR) {
+        if (xorKey_->text().isEmpty()) {
+            QMessageBox::warning(this, "输入错误", "密钥不能为空!");
+            return;
+        }
+        if (xorInput_->text().isEmpty()) {
+            QMessageBox::warning(this, "输入错误", "输入文本不能为空!");
+            return;
+        }
         emit xorStart(xorInput_->text(), xorKey_->text());
     }
 }

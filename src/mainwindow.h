@@ -15,6 +15,8 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     void autoStartCaesar(const QString& text, int shift);
     void autoStartRSA();
+    void autoStartBase64(const QString& text);
+    void autoStartXOR(const QString& text, const QString& key);
 
 private slots:
     void onCaesarStart(const QString& text, int shift);
