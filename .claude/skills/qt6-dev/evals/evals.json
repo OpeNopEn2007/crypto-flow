@@ -1,0 +1,23 @@
+{
+  "skill_name": "qt6-dev",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我需要用 Qt 6 写一个简单的记事本应用，支持打开、编辑、保存文本文件。要有菜单栏、工具栏和状态栏。请帮我搭建项目结构和主要代码。",
+      "expected_output": "生成完整的 Qt 6 Widgets 项目，包含 CMakeLists.txt、main.cpp、MainWindow 类，正确使用信号槽连接菜单动作，状态栏显示当前文件路径",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我要做一个联系人管理器，用 Qt 6 的 Model/View 架构。数据存在 SQLite 里，界面是一个表格视图，支持增删改查。Model 要自定义，不能用 QSqlTableModel。",
+      "expected_output": "自定义 QAbstractTableModel 子类，正确实现 rowCount/data/roleNames，SQLite 集成，QTableView 使用，beginInsertRows/endInsertRows 正确包裹数据变更",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "做一个 Qt 6 QML 天气应用，C++ 后端负责网络请求获取天气数据，QML 前端显示。需要把 C++ 对象暴露给 QML，用 Q_PROPERTY 绑定数据。",
+      "expected_output": "QML_ELEMENT 宏注册，Q_PROPERTY 属性定义，Q_INVOKABLE 方法，QML 中正确 import 和使用 C++ 类型，CMake 中 qt_add_qml_module 配置",
+      "files": []
+    }
+  ]
+}
