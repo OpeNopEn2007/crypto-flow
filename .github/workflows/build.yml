@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -27,6 +28,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1-mesa-dev libglib2.0-dev \
+            libfontconfig1-dev libfreetype-dev \
+            libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev \
+            libxi-dev libxrender-dev libxcb1-dev libxcb-glx0-dev \
+            libxcb-keysyms1-dev libxcb-image0-dev libxcb-shm0-dev \
+            libxcb-icccm4-dev libxcb-sync-dev libxcb-xfixes0-dev \
+            libxcb-shape0-dev libxcb-randr0-dev libxcb-render-util0-dev \
+            libxcb-xinerama0-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libegl1-mesa-dev
 
       - name: Install Qt 6
         uses: jurplel/install-qt-action@v4
@@ -70,9 +86,7 @@ jobs:
           </dict>
           </plist>
           PLIST
-          # Bundle Qt frameworks
-          macdeployqt dist/CryptoFlow.app -qmldir=. 2>/dev/null || true
-          # Create DMG
+          macdeployqt dist/CryptoFlow.app 2>/dev/null || true
           hdiutil create -volname CryptoFlow -srcfolder dist -ov -format UDZO CryptoFlow-macOS-arm64.dmg
 
       # ── Windows: windeployqt ──
@@ -85,26 +99,29 @@ jobs:
           windeployqt dist\CryptoFlow.exe
           Compress-Archive -Path dist\* -DestinationPath CryptoFlow-Windows-x64.zip
 
-      # ── Linux: linuxdeployqt ──
+      # ── Linux: package with bundled Qt libs ──
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          mkdir -p dist/usr/bin dist/usr/share/applications dist/usr/share/icons
-          cp build/CryptoFlow dist/usr/bin/
-          cp resources/style.qss dist/usr/share/
-          cat > dist/usr/share/applications/cryptoflow.desktop << 'EOF'
-          [Desktop Entry]
-          Type=Application
-          Name=CryptoFlow
-          Exec=CryptoFlow
-          Icon=cryptoflow
-          Categories=Education;
-          EOF
-          # Download linuxdeployqt
-          wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage -O linuxdeployqt
-          chmod +x linuxdeployqt
-          ./linuxdeployqt dist/usr/bin/CryptoFlow -appimage -qmldir=. 2>/dev/null || true
-          mv CryptoFlow*.AppImage CryptoFlow-Linux-x64.AppImage
+          mkdir -p dist
+          cp build/CryptoFlow dist/
+          cp resources/style.qss dist/
+          # Bundle Qt libraries
+          ldd build/CryptoFlow | grep -o '/[^ ]*qt6[^ ]*' | while read lib; do
+            cp -L "$lib" dist/ 2>/dev/null || true
+          done
+          # Also copy Qt platform plugin
+          mkdir -p dist/platforms
+          cp $QT_ROOT_DIR/plugins/platforms/libqxcb.so dist/platforms/ 2>/dev/null || true
+          # Create a simple launcher script
+          cat > dist/CryptoFlow.sh << 'LAUNCHER'
+          #!/bin/bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          export LD_LIBRARY_PATH="$DIR:$LD_LIBRARY_PATH"
+          exec "$DIR/CryptoFlow" "$@"
+          LAUNCHER
+          chmod +x dist/CryptoFlow.sh
+          tar -czf CryptoFlow-Linux-x64.tar.gz -C dist .
 
       # ── Upload artifacts ──
       - name: Upload (macOS)
@@ -126,7 +143,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: CryptoFlow-Linux-x64.AppImage
+          path: CryptoFlow-Linux-x64.tar.gz
 
   # ── Create GitHub Release on tag push ──
   release:
