@@ -22,6 +22,27 @@ bool RSAEngine::isPrime(int64_t n) {
 
 int64_t RSAEngine::modPow(int64_t base, int64_t exp, int64_t mod) {
     if (mod <= 0) return 0;
+#ifdef _MSC_VER
+    // MSVC 不支持 __int128，用俄罗斯农民乘法防溢出
+    auto mulmod = [](int64_t a, int64_t b, int64_t m) -> int64_t {
+        int64_t result = 0;
+        a %= m;
+        while (b > 0) {
+            if (b & 1) result = (result + a) % m;
+            a = (a * 2) % m;
+            b >>= 1;
+        }
+        return result;
+    };
+    int64_t result = 1;
+    int64_t b = base % mod;
+    while (exp > 0) {
+        if (exp & 1) result = mulmod(result, b, mod);
+        exp >>= 1;
+        b = mulmod(b, b, mod);
+    }
+    return result;
+#else
     __int128 result = 1;
     __int128 b = base % mod;
     __int128 m = mod;
@@ -31,6 +52,7 @@ int64_t RSAEngine::modPow(int64_t base, int64_t exp, int64_t mod) {
         b = (b * b) % m;
     }
     return static_cast<int64_t>(result);
+#endif
 }
 
 int64_t RSAEngine::modInverse(int64_t a, int64_t m) {
