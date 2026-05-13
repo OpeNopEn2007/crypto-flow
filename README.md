@@ -20,6 +20,28 @@
 - 支持手动输入明文、密钥、位移量等参数
 - 自动演示模式（CLI 参数直接启动）
 
+## 演示
+
+### 凯撒密码
+
+![凯撒密码演示](display/gifs/caesar.gif)
+
+### 维吉尼亚密码
+
+![维吉尼亚密码演示](display/gifs/vigenere.gif)
+
+### RSA
+
+![RSA 演示](display/gifs/rsa.gif)
+
+### Base64 编码
+
+![Base64 演示](display/gifs/base64.gif)
+
+### XOR 加密
+
+![XOR 演示](display/gifs/xor.gif)
+
 ## 技术栈
 
 - **语言**: C++20
