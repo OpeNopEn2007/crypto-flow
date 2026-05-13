@@ -29,30 +29,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies (Linux)
+      - name: Install Qt 6 (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgl1-mesa-dev libglib2.0-dev \
-            libfontconfig1-dev libfreetype-dev \
-            libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev \
-            libxi-dev libxrender-dev libxcb1-dev libxcb-glx0-dev \
-            libxcb-keysyms1-dev libxcb-image0-dev libxcb-shm0-dev \
-            libxcb-icccm4-dev libxcb-sync-dev libxcb-xfixes0-dev \
-            libxcb-shape0-dev libxcb-randr0-dev libxcb-render-util0-dev \
-            libxcb-xinerama0-dev libxkbcommon-dev libxkbcommon-x11-dev \
-            libegl1-mesa-dev
+            qt6-base-dev libgl1-mesa-dev libvulkan-dev \
+            libfontconfig1-dev libfreetype-dev
 
-      - name: Install Qt 6
+      - name: Install Qt 6 (macOS)
+        if: runner.os == 'macOS'
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.6.3'
           target: desktop
           archives: 'qtbase'
 
-      - name: Configure (macOS/Linux)
-        if: runner.os != 'Windows'
+      - name: Install Qt 6 (Windows)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.6.3'
+          target: desktop
+          archives: 'qtbase'
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        run: cmake -B build
+
+      - name: Configure (macOS)
+        if: runner.os == 'macOS'
         run: cmake -B build -DCMAKE_PREFIX_PATH=$QT_ROOT_DIR ${{ matrix.cmake_args }}
 
       - name: Configure (Windows)
@@ -105,15 +111,16 @@ jobs:
         run: |
           mkdir -p dist
           cp build/CryptoFlow dist/
-          cp resources/style.qss dist/
-          # Bundle Qt libraries
-          ldd build/CryptoFlow | grep -o '/[^ ]*qt6[^ ]*' | while read lib; do
+          # Bundle Qt libraries from system
+          ldd build/CryptoFlow | grep -o '/[^ ]*' | grep -E "qt6|icu|xcb" | while read lib; do
             cp -L "$lib" dist/ 2>/dev/null || true
           done
-          # Also copy Qt platform plugin
+          # Copy Qt platform plugin
           mkdir -p dist/platforms
-          cp $QT_ROOT_DIR/plugins/platforms/libqxcb.so dist/platforms/ 2>/dev/null || true
-          # Create a simple launcher script
+          for p in /usr/lib/x86_64-linux-gnu/qt6/plugins/platforms/libq*.so; do
+            cp "$p" dist/platforms/ 2>/dev/null || true
+          done
+          # Create launcher script
           cat > dist/CryptoFlow.sh << 'LAUNCHER'
           #!/bin/bash
           DIR="$(cd "$(dirname "$0")" && pwd)"
