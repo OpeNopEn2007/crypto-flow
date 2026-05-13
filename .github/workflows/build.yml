@@ -14,18 +14,12 @@ jobs:
         include:
           - os: macos-latest
             artifact_name: CryptoFlow-macOS-arm64
-            qt_host: mac
-            qt_target: clang
             cmake_args: '-DCMAKE_OSX_ARCHITECTURES=arm64'
           - os: windows-latest
             artifact_name: CryptoFlow-Windows-x64
-            qt_host: windows
-            qt_target: msvc2022_64
             cmake_args: '-G "Visual Studio 17 2022" -A x64'
           - os: ubuntu-22.04
             artifact_name: CryptoFlow-Linux-x64
-            qt_host: linux
-            qt_target: gcc_64
             cmake_args: ''
 
     runs-on: ${{ matrix.os }}
@@ -38,8 +32,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.6.3'
-          host: ${{ matrix.qt_host }}
-          target: ${{ matrix.qt_target }}
+          target: desktop
           archives: 'qtbase'
 
       - name: Configure (macOS/Linux)
